@@ -29,6 +29,7 @@ import java.util.List;
  */
 public final class Request {
   private final URL url;
+  private final byte[] hostIP;
   private final String method;
   private final Headers headers;
   private final RequestBody body;
@@ -40,6 +41,7 @@ public final class Request {
 
   private Request(Builder builder) {
     this.url = builder.url;
+    this.hostIP = builder.hostIP;
     this.method = builder.method;
     this.headers = builder.headers.build();
     this.body = builder.body;
@@ -62,6 +64,10 @@ public final class Request {
 
   public String urlString() {
     return url.toString();
+  }
+
+  public byte[] hostIP() {
+    return hostIP;
   }
 
   public String method() {
@@ -121,6 +127,7 @@ public final class Request {
 
   public static class Builder {
     private URL url;
+    private byte[] hostIP;
     private String method;
     private Headers.Builder headers;
     private RequestBody body;
@@ -134,6 +141,7 @@ public final class Request {
 
     private Builder(Request request) {
       this.url = request.url;
+      this.hostIP = request.hostIP;
       this.method = request.method;
       this.body = request.body;
       this.tag = request.tag;
@@ -152,6 +160,11 @@ public final class Request {
     public Builder url(URL url) {
       if (url == null) throw new IllegalArgumentException("url == null");
       this.url = url;
+      return this;
+    }
+
+    public Builder hostIP(byte[] hostIP) {
+      this.hostIP = hostIP;
       return this;
     }
 

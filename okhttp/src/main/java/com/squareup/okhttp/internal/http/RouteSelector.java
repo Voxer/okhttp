@@ -227,8 +227,16 @@ public final class RouteSelector {
       socketPort = proxySocketAddress.getPort();
     }
 
-    // Try each address for best behavior in mixed IPv4/IPv6 environments.
-    socketAddresses = dns.getAllByName(socketHost);
+    // Override IP specified ?
+    byte[] hostIP = address.getHostIP();
+    if (hostIP != null) {
+      socketAddresses = new InetAddress[1];
+      socketAddresses[0] = dns.getByAddress(hostIP);
+    } else {
+      // Try each address for best behavior in mixed IPv4/IPv6 environments.
+      socketAddresses = dns.getAllByName(socketHost);
+      nextSocketAddressIndex = 0;
+    }
     nextSocketAddressIndex = 0;
   }
 

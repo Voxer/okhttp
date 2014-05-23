@@ -301,13 +301,14 @@ public final class HttpEngine {
       if (uriHost == null || uriHost.length() == 0) {
         throw new UnknownHostException(request.url().toString());
       }
+      byte[] hostIP = request.hostIP();
       SSLSocketFactory sslSocketFactory = null;
       HostnameVerifier hostnameVerifier = null;
       if (request.isHttps()) {
         sslSocketFactory = client.getSslSocketFactory();
         hostnameVerifier = client.getHostnameVerifier();
       }
-      Address address = new Address(uriHost, getEffectivePort(request.url()),
+      Address address = new Address(uriHost, hostIP, getEffectivePort(request.url()),
           client.getSocketFactory(), sslSocketFactory, hostnameVerifier, client.getAuthenticator(),
           client.getProxy(), client.getProtocols());
       routeSelector = new RouteSelector(address, request.uri(), client.getProxySelector(),
