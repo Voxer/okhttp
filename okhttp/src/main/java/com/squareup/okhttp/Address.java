@@ -54,7 +54,6 @@ public final class Address {
       throws UnknownHostException {
     if (uriHost == null) throw new NullPointerException("uriHost == null");
     if (uriPort <= 0) throw new IllegalArgumentException("uriPort <= 0: " + uriPort);
-    if (hostIP == null) hostIP = new byte[4];
     if (authenticator == null) throw new IllegalArgumentException("authenticator == null");
     if (protocols == null) throw new IllegalArgumentException("protocols == null");
     this.proxy = proxy;

@@ -144,6 +144,9 @@ public final class Connection {
       socket = route.address.socketFactory.createSocket();
     }
 
+    // Throw in nodelay
+    socket.setTcpNoDelay(true);
+
     socket.setSoTimeout(readTimeout);
     Platform.get().connectSocket(socket, route.inetSocketAddress, connectTimeout);
 
