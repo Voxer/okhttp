@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.CacheRequest;
 import java.net.CookieHandler;
+import java.net.InetAddress;
 import java.net.ProtocolException;
 import java.net.Proxy;
 import java.net.URL;
@@ -301,7 +302,7 @@ public final class HttpEngine {
       if (uriHost == null || uriHost.length() == 0) {
         throw new UnknownHostException(request.url().toString());
       }
-      byte[] hostIP = request.hostIP();
+      InetAddress hostIP = request.hostIP();
       SSLSocketFactory sslSocketFactory = null;
       HostnameVerifier hostnameVerifier = null;
       if (request.isHttps()) {

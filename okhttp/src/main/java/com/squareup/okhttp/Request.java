@@ -17,6 +17,7 @@ package com.squareup.okhttp;
 
 import com.squareup.okhttp.internal.Platform;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -29,7 +30,7 @@ import java.util.List;
  */
 public final class Request {
   private final URL url;
-  private final byte[] hostIP;
+  private final InetAddress hostIP;
   private final String method;
   private final Headers headers;
   private final RequestBody body;
@@ -66,7 +67,7 @@ public final class Request {
     return url.toString();
   }
 
-  public byte[] hostIP() {
+  public InetAddress hostIP() {
     return hostIP;
   }
 
@@ -127,7 +128,7 @@ public final class Request {
 
   public static class Builder {
     private URL url;
-    private byte[] hostIP;
+    private InetAddress hostIP;
     private String method;
     private Headers.Builder headers;
     private RequestBody body;
@@ -163,7 +164,7 @@ public final class Request {
       return this;
     }
 
-    public Builder hostIP(byte[] hostIP) {
+    public Builder hostIP(InetAddress hostIP) {
       this.hostIP = hostIP;
       return this;
     }

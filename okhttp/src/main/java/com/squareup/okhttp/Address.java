@@ -16,6 +16,7 @@
 package com.squareup.okhttp;
 
 import com.squareup.okhttp.internal.Util;
+import java.net.InetAddress;
 import java.net.Proxy;
 import java.net.UnknownHostException;
 import java.util.List;
@@ -39,7 +40,7 @@ import static com.squareup.okhttp.internal.Util.equal;
 public final class Address {
   final Proxy proxy;
   final String uriHost;
-  final byte[] hostIP;
+  final InetAddress hostIP;
   final int uriPort;
   final SocketFactory socketFactory;
   final SSLSocketFactory sslSocketFactory;
@@ -47,7 +48,7 @@ public final class Address {
   final Authenticator authenticator;
   final List<Protocol> protocols;
 
-  public Address(String uriHost, byte[] hostIP, int uriPort, SocketFactory socketFactory,
+  public Address(String uriHost, InetAddress hostIP, int uriPort, SocketFactory socketFactory,
       SSLSocketFactory sslSocketFactory, HostnameVerifier hostnameVerifier,
       Authenticator authenticator, Proxy proxy, List<Protocol> protocols)
       throws UnknownHostException {
@@ -73,7 +74,7 @@ public final class Address {
   }
 
   /** Returns the IP passed in from user */
-  public byte[] getHostIP() {
+  public InetAddress getHostIP() {
     return hostIP;
   }
 
@@ -134,7 +135,7 @@ public final class Address {
       Address that = (Address) other;
       return equal(this.proxy, that.proxy)
           && this.uriHost.equals(that.uriHost)
-          && Arrays.equals(this.hostIP, that.hostIP)
+          && equal(this.hostIP, that.hostIP)
           && this.uriPort == that.uriPort
           && equal(this.sslSocketFactory, that.sslSocketFactory)
           && equal(this.hostnameVerifier, that.hostnameVerifier)
@@ -147,7 +148,7 @@ public final class Address {
   @Override public int hashCode() {
     int result = 17;
     result = 31 * result + uriHost.hashCode();
-    result = 31 * result + hostIP[0] + hostIP[1] + hostIP[2] + hostIP[3];
+    result = 31 * result + (hostIP != null ? hostIP.hashCode() : 0);
     result = 31 * result + uriPort;
     result = 31 * result + (sslSocketFactory != null ? sslSocketFactory.hashCode() : 0);
     result = 31 * result + (hostnameVerifier != null ? hostnameVerifier.hashCode() : 0);
