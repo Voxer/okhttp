@@ -100,6 +100,7 @@ public final class SpdyTransport implements Transport {
         writeNameValueBlock(request, spdyConnection.getProtocol(), version), hasRequestBody,
         hasResponseBody);
     stream.readTimeout().timeout(request.readTimeout(), TimeUnit.MILLISECONDS);
+    stream.writeTimeout().timeout(request.writeTimeout(), TimeUnit.MILLISECONDS);
 
     final PushObserver pushObserver = request.pushObserver();
     if (pushObserver != null) {
@@ -113,9 +114,6 @@ public final class SpdyTransport implements Transport {
             Request pushReq = readPushNameValueBlock(
                 push.getRequestHeaders(),
                 spdyConnection.getProtocol()).build();
-
-            // Intercept here for timeout
-            push.readTimeout().timeout(pushObserver.readTimeout(pushReq), TimeUnit.MILLISECONDS);
 
             SpdySource source = new SpdySource(push, null);
             BufferedSource buffer;
