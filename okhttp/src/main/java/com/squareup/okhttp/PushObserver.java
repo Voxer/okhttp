@@ -47,4 +47,11 @@ public interface PushObserver {
    * @param last when true, there is no response data.
    */
   boolean onPush(Request push, BufferedSource data);
+
+  /**
+   * Read timeout
+   * @param push server-initiated request
+   * @return read timeout in milliseconds for this request
+   */
+  long readTimeout(Request push);
 }

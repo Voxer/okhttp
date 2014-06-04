@@ -35,6 +35,8 @@ public final class Request {
   private final RequestBody body;
   private final Object tag;
   private final PushObserver pushObserver;
+  private final long readTimeout;
+  private final long writeTimeout;
 
   private volatile URL javaNetUrl; // Lazily initialized.
   private volatile URI javaNetUri; // Lazily initialized.
@@ -48,6 +50,8 @@ public final class Request {
     this.body = builder.body;
     this.tag = builder.tag != null ? builder.tag : this;
     this.pushObserver = builder.pushObserver;
+    this.readTimeout = builder.readTimeout;
+    this.writeTimeout = builder.writeTimeout;
   }
 
   public HttpUrl httpUrl() {
@@ -104,6 +108,14 @@ public final class Request {
     return pushObserver;
   }
 
+  public long readTimeout() {
+    return readTimeout;
+  }
+
+  public long writeTimeout() {
+    return writeTimeout;
+  }
+
   public Builder newBuilder() {
     return new Builder(this);
   }
@@ -139,6 +151,8 @@ public final class Request {
     private RequestBody body;
     private Object tag;
     private PushObserver pushObserver = null;
+    private long readTimeout;
+    private long writeTimeout;
 
     public Builder() {
       this.method = "GET";
@@ -153,6 +167,8 @@ public final class Request {
       this.tag = request.tag;
       this.headers = request.headers.newBuilder();
       this.pushObserver = request.pushObserver;
+      this.readTimeout = request.readTimeout;
+      this.writeTimeout = request.writeTimeout;
     }
 
     public Builder url(HttpUrl url) {
@@ -283,6 +299,16 @@ public final class Request {
 
     public Builder pushObserver(PushObserver pushObserver) {
       this.pushObserver = pushObserver;
+      return this;
+    }
+
+    public Builder readTimeout(long readTimeout) {
+      this.readTimeout = readTimeout;
+      return this;
+    }
+
+    public Builder writeTimeout(long writeTimeout) {
+      this.writeTimeout = writeTimeout;
       return this;
     }
 

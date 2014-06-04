@@ -95,7 +95,7 @@ public final class SpdyTransport implements Transport {
     stream = spdyConnection.newStream(
         writeNameValueBlock(request, spdyConnection.getProtocol(), version), permitsRequestBody,
         hasResponseBody);
-    stream.readTimeout().timeout(httpEngine.client.getReadTimeout(), TimeUnit.MILLISECONDS);
+    stream.readTimeout().timeout(request.readTimeout(), TimeUnit.MILLISECONDS);
 
     final PushObserver pushObserver = request.pushObserver();
     if (pushObserver != null) {
@@ -109,6 +109,10 @@ public final class SpdyTransport implements Transport {
             Request pushReq = readPushNameValueBlock(
                 push.getRequestHeaders(),
                 spdyConnection.getProtocol()).build();
+
+            // Intercept here for timeout
+            push.readTimeout().timeout(pushObserver.readTimeout(pushReq), TimeUnit.MILLISECONDS);
+
             BufferedSource buffer;
             if (httpEngine.isTransparentGzip() &&
                 "gzip".equalsIgnoreCase(pushReq.headers().get("Content-Encoding"))) {
