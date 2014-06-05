@@ -39,6 +39,8 @@ public final class Request {
   private final long readTimeout;
   private final long writeTimeout;
 
+  private Headers trailers;
+
   private volatile URI uri; // Lazily initialized.
   private volatile CacheControl cacheControl; // Lazily initialized.
 
@@ -113,6 +115,14 @@ public final class Request {
 
   public Builder newBuilder() {
     return new Builder(this);
+  }
+
+  public void setTrailers(Headers headers) {
+    this.trailers = headers;
+  }
+
+  public Headers trailers() {
+    return trailers;
   }
 
   /**

@@ -188,6 +188,11 @@ public final class Spdy3 implements Variant {
       } else {
         int streamId = w1 & 0x7fffffff;
         boolean inFinished = (flags & FLAG_FIN) != 0;
+
+        if (inFinished) {
+          System.out.println("DATA for stream_ID=" + streamId + " inFinished..");
+        }
+
         handler.data(inFinished, streamId, source, length);
         return true;
       }

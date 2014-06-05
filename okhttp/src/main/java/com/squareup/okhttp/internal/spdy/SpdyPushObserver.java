@@ -56,6 +56,13 @@ public interface SpdyPushObserver {
    */
   boolean onPush(SpdyStream associated, SpdyStream push);
 
+  /**
+   * Update with any newly received headers
+   * 
+   * @param stream - updated or new headers
+   */
+  void setHeaders(List<Header> headers);
+
   SpdyPushObserver CANCEL = new SpdyPushObserver() {
 
     @Override public boolean onPromise(int streamId, List<Header> requestHeaders) {
@@ -64,6 +71,9 @@ public interface SpdyPushObserver {
 
     @Override public boolean onPush(SpdyStream associated, SpdyStream push) {
       return true;
+    }
+
+    @Override public void setHeaders(List<Header> headers) {
     }
   };
 }
