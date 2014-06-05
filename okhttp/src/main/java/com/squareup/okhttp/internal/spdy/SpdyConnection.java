@@ -80,7 +80,8 @@ public final class SpdyConnection implements Closeable {
    * run on the callback executor.
    */
   private final IncomingStreamHandler handler;
-  private final Map<Integer, SpdyStream> streams = new HashMap<>();
+  private final Map<Integer, SpdyStream> streams = new HashMap<Integer, SpdyStream>();
+  private final Map<Integer, SpdyStream> associatedStreams = new HashMap<Integer, SpdyStream>();
   private final String hostName;
   private int lastGoodStreamId;
   private int nextStreamId;
@@ -606,6 +607,7 @@ public final class SpdyConnection implements Closeable {
       dataStream.receiveData(source, length);
       if (inFinished) {
         dataStream.receiveFin();
+        associatedStreams.remove(streamId);
       }
     }
 
@@ -621,7 +623,12 @@ public final class SpdyConnection implements Closeable {
 
         // Fetch associated stream
         if (pushedStream(streamId)) {
-          associated = getStream(associatedStreamId);
+
+          if (associatedStreamId == -1) { // Find its parent
+            associated = associatedStreams.get(streamId);
+          } else {
+            associated = getStream(associatedStreamId);
+          }
 
           if (associated == null) {
             writeSynResetLater(streamId, ErrorCode.INVALID_STREAM);
@@ -650,6 +657,9 @@ public final class SpdyConnection implements Closeable {
 
           // Handle PUSH streams
           if (pushedStream(streamId)) {
+            // Store for later
+            associatedStreams.put(streamId, associated);
+            newStream.receiveHeaders(headerBlock, headersMode);
             pushStreamLater(associated, newStream);
             return;
           }
@@ -673,15 +683,30 @@ public final class SpdyConnection implements Closeable {
       }
 
       // The headers claim to be for a new stream, but we already have one.
-      if (headersMode.failIfStreamPresent()) {
+      if (!pushedStream(streamId) && headersMode.failIfStreamPresent()) {
         stream.closeLater(ErrorCode.PROTOCOL_ERROR);
         removeStream(streamId);
         return;
       }
-
       // Update an existing stream.
       stream.receiveHeaders(headerBlock, headersMode);
-      if (inFinished) stream.receiveFin();
+      if (pushedStream(streamId)) {
+        SpdyPushObserver streamPushObserver;
+        synchronized (associated) {
+          if (associated.pushObserver != null) {
+            streamPushObserver = associated.pushObserver;
+          } else {
+            streamPushObserver = pushObserver;
+          }
+          synchronized (stream) {
+            streamPushObserver.setHeaders(headerBlock);
+          }
+        }
+      }
+      if (inFinished) {
+        stream.receiveFin();
+        associatedStreams.remove(streamId);
+      }
     }
 
     @Override public void rstStream(int streamId, ErrorCode errorCode) {

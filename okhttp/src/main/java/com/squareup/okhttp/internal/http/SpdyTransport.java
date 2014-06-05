@@ -101,15 +101,17 @@ public final class SpdyTransport implements Transport {
     final PushObserver pushObserver = request.pushObserver();
     if (pushObserver != null) {
       stream.pushObserver = new SpdyPushObserver() {
+        Request pushReq = null;
+
         @Override public synchronized boolean onPromise(int streamId, List<Header> requestHeaders) {
           return true;
         }
 
         @Override public synchronized boolean onPush(SpdyStream associated, SpdyStream push) {
           try {
-            Request pushReq = readPushNameValueBlock(
-                push.getRequestHeaders(),
-                spdyConnection.getProtocol()).build();
+            pushReq = readPushNameValueBlock(
+              push.getRequestHeaders(),
+              spdyConnection.getProtocol()).build();
 
             BufferedSource buffer;
             if (httpEngine.isTransparentGzip() &&
@@ -122,6 +124,14 @@ public final class SpdyTransport implements Transport {
           } catch (IOException ignored) {
             return true;
           }
+        }
+
+        @Override public synchronized void setHeaders(List<Header> headers) {
+          Headers.Builder builder = new Headers.Builder();
+          for (Header h : headers) {
+            builder.add(h.name.utf8(), h.value.utf8());
+          }
+          pushReq.setTrailers(builder.build());
         }
       };
     }
