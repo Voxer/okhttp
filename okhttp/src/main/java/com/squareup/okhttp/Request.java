@@ -16,6 +16,7 @@
 package com.squareup.okhttp;
 
 import com.squareup.okhttp.internal.Platform;
+import com.squareup.okhttp.internal.http.HttpMethod;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.MalformedURLException;
@@ -29,8 +30,8 @@ import java.util.List;
  * is null or itself immutable.
  */
 public final class Request {
-  private final URL url;
   private final InetAddress hostIP;
+  private final String urlString;
   private final String method;
   private final Headers headers;
   private final RequestBody body;
@@ -41,12 +42,13 @@ public final class Request {
 
   private Headers trailers;
 
+  private volatile URL url; // Lazily initialized.
   private volatile URI uri; // Lazily initialized.
   private volatile CacheControl cacheControl; // Lazily initialized.
 
   private Request(Builder builder) {
-    this.url = builder.url;
     this.hostIP = builder.hostIP;
+    this.urlString = builder.urlString;
     this.method = builder.method;
     this.headers = builder.headers.build();
     this.body = builder.body;
@@ -54,10 +56,16 @@ public final class Request {
     this.pushObserver = builder.pushObserver;
     this.readTimeout = builder.readTimeout;
     this.writeTimeout = builder.writeTimeout;
+    this.url = builder.url;
   }
 
   public URL url() {
-    return url;
+    try {
+      URL result = url;
+      return result != null ? result : (url = new URL(urlString));
+    } catch (MalformedURLException e) {
+      throw new RuntimeException("Malformed URL: " + urlString, e);
+    }
   }
 
   public URI uri() throws IOException {
@@ -70,7 +78,7 @@ public final class Request {
   }
 
   public String urlString() {
-    return url.toString();
+    return urlString;
   }
 
   public InetAddress hostIP() {
@@ -149,6 +157,7 @@ public final class Request {
   }
 
   public static class Builder {
+    private String urlString;
     private URL url;
     private InetAddress hostIP;
     private String method;
@@ -165,6 +174,7 @@ public final class Request {
     }
 
     private Builder(Request request) {
+      this.urlString = request.urlString;
       this.url = request.url;
       this.hostIP = request.hostIP;
       this.method = request.method;
@@ -177,16 +187,15 @@ public final class Request {
     }
 
     public Builder url(String url) {
-      try {
-        return url(new URL(url));
-      } catch (MalformedURLException e) {
-        throw new IllegalArgumentException("Malformed URL: " + url);
-      }
+      if (url == null) throw new IllegalArgumentException("url == null");
+      urlString = url;
+      return this;
     }
 
     public Builder url(URL url) {
       if (url == null) throw new IllegalArgumentException("url == null");
       this.url = url;
+      this.urlString = url.toString();
       return this;
     }
 
@@ -252,6 +261,9 @@ public final class Request {
       if (method == null || method.length() == 0) {
         throw new IllegalArgumentException("method == null || method.length() == 0");
       }
+      if (body != null && !HttpMethod.hasRequestBody(method)) {
+        throw new IllegalArgumentException("method " + method + " must not have a request body.");
+      }
       this.method = method;
       this.body = body;
       return this;
@@ -283,7 +295,7 @@ public final class Request {
     }
 
     public Request build() {
-      if (url == null) throw new IllegalStateException("url == null");
+      if (urlString == null) throw new IllegalStateException("url == null");
       return new Request(this);
     }
   }

@@ -35,11 +35,13 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -51,8 +53,10 @@ import okio.GzipSink;
 import okio.Okio;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
+import static java.lang.Thread.UncaughtExceptionHandler;
 import static java.net.CookiePolicy.ACCEPT_ORIGINAL_SERVER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -65,6 +69,7 @@ public final class CallTest {
   private MockWebServer server2 = new MockWebServer();
   private OkHttpClient client = new OkHttpClient();
   private RecordingCallback callback = new RecordingCallback();
+  private UncaughtExceptionHandler defaultUncaughtExceptionHandler;
 
   private static final SSLContext sslContext = SslContextBuilder.localhost();
   private Cache cache;
@@ -73,12 +78,14 @@ public final class CallTest {
     String tmp = System.getProperty("java.io.tmpdir");
     File cacheDir = new File(tmp, "HttpCache-" + UUID.randomUUID());
     cache = new Cache(cacheDir, Integer.MAX_VALUE);
+    defaultUncaughtExceptionHandler = Thread.getDefaultUncaughtExceptionHandler();
   }
 
   @After public void tearDown() throws Exception {
     server.shutdown();
     server2.shutdown();
     cache.delete();
+    Thread.setDefaultUncaughtExceptionHandler(defaultUncaughtExceptionHandler);
   }
 
   @Test public void get() throws Exception {
@@ -92,6 +99,7 @@ public final class CallTest {
 
     executeSynchronously(request)
         .assertCode(200)
+        .assertSuccessful()
         .assertHeader("Content-Type", "text/plain")
         .assertBody("abc");
 
@@ -102,6 +110,47 @@ public final class CallTest {
     assertNull(recordedRequest.getHeader("Content-Length"));
   }
 
+  @Test public void lazilyEvaluateRequestUrl() throws Exception {
+    server.enqueue(new MockResponse().setBody("abc"));
+    server.play();
+
+    Request request1 = new Request.Builder()
+        .url("foo://bar?baz")
+        .build();
+    Request request2 = request1.newBuilder()
+        .url(server.getUrl("/"))
+        .build();
+    executeSynchronously(request2)
+        .assertCode(200)
+        .assertSuccessful()
+        .assertBody("abc");
+  }
+
+  @Ignore // TODO(jwilson): fix.
+  @Test public void invalidScheme() throws Exception {
+    try {
+      Request request = new Request.Builder()
+          .url("ftp://hostname/path")
+          .build();
+      executeSynchronously(request);
+      fail();
+    } catch (IllegalArgumentException expected) {
+    }
+  }
+
+  @Test public void getReturns500() throws Exception {
+    server.enqueue(new MockResponse().setResponseCode(500));
+    server.play();
+
+    Request request = new Request.Builder()
+        .url(server.getUrl("/"))
+        .build();
+
+    executeSynchronously(request)
+        .assertCode(500)
+        .assertNotSuccessful();
+  }
+
   @Test public void get_SPDY_3() throws Exception {
     enableProtocol(Protocol.SPDY_3);
     get();
@@ -110,6 +159,17 @@ public final class CallTest {
   @Test public void get_HTTP_2() throws Exception {
     enableProtocol(Protocol.HTTP_2);
     get();
+  }
+
+  @Test public void getWithRequestBody() throws Exception {
+    server.enqueue(new MockResponse());
+    server.play();
+
+    try {
+      new Request.Builder().method("GET", RequestBody.create(MediaType.parse("text/plain"), "abc"));
+      fail();
+    } catch (IllegalArgumentException expected) {
+    }
   }
 
   @Test public void head() throws Exception {
@@ -325,6 +385,23 @@ public final class CallTest {
     }
   }
 
+  @Test public void unspecifiedRequestBodyContentTypeDoesNotGetDefault() throws Exception {
+    server.enqueue(new MockResponse());
+    server.play();
+
+    Request request = new Request.Builder()
+        .url(server.getUrl("/"))
+        .method("POST", RequestBody.create(null, "abc"))
+        .build();
+
+    executeSynchronously(request).assertCode(200);
+
+    RecordedRequest recordedRequest = server.takeRequest();
+    assertEquals(null, recordedRequest.getHeader("Content-Type"));
+    assertEquals("3", recordedRequest.getHeader("Content-Length"));
+    assertEquals("abc", recordedRequest.getUtf8Body());
+  }
+
   @Test public void illegalToExecuteTwice() throws Exception {
     server.enqueue(new MockResponse()
         .setBody("abc")
@@ -407,6 +484,41 @@ public final class CallTest {
     assertTrue(server.takeRequest().getHeaders().contains("User-Agent: AsyncApiTest"));
   }
 
+  @Test public void onResponseThrowsIsHandledByUncaughtExceptionHandler() throws Exception {
+    server.enqueue(new MockResponse());
+    server.play();
+
+    Request request = new Request.Builder()
+        .url(server.getUrl("/"))
+        .build();
+
+    final AtomicReference<Throwable> uncaughtExceptionRef = new AtomicReference<>();
+    final CountDownLatch latch = new CountDownLatch(1);
+
+    Thread.setDefaultUncaughtExceptionHandler(new UncaughtExceptionHandler() {
+      @Override public void uncaughtException(Thread thread, Throwable throwable) {
+        uncaughtExceptionRef.set(throwable);
+        latch.countDown();
+      }
+    });
+
+    client.newCall(request).enqueue(new Callback() {
+      @Override public void onFailure(Request request, IOException e) {
+        fail();
+      }
+
+      @Override public void onResponse(Response response) throws IOException {
+        throw new IOException("a");
+      }
+    });
+
+    latch.await();
+    Throwable uncaughtException = uncaughtExceptionRef.get();
+    assertEquals(RuntimeException.class, uncaughtException.getClass());
+    assertEquals(IOException.class, uncaughtException.getCause().getClass());
+    assertEquals("a", uncaughtException.getCause().getMessage());
+  }
+
   @Test public void connectionPooling() throws Exception {
     server.enqueue(new MockResponse().setBody("abc"));
     server.enqueue(new MockResponse().setBody("def"));
@@ -454,7 +566,7 @@ public final class CallTest {
 
     Request request = new Request.Builder().url(server.getUrl("/a")).build();
     client.newCall(request).enqueue(new Callback() {
-      @Override public void onFailure(Request request, Throwable throwable) {
+      @Override public void onFailure(Request request, IOException e) {
         throw new AssertionError();
       }
 
@@ -1167,13 +1279,13 @@ public final class CallTest {
     server.play();
 
     final CountDownLatch latch = new CountDownLatch(1);
-    final AtomicReference<String> bodyRef = new AtomicReference<String>();
+    final AtomicReference<String> bodyRef = new AtomicReference<>();
     final AtomicBoolean failureRef = new AtomicBoolean();
 
     Request request = new Request.Builder().url(server.getUrl("/a")).tag("request A").build();
     final Call call = client.newCall(request);
     call.enqueue(new Callback() {
-      @Override public void onFailure(Request request, Throwable throwable) {
+      @Override public void onFailure(Request request, IOException e) {
         failureRef.set(true);
         latch.countDown();
       }
@@ -1235,6 +1347,54 @@ public final class CallTest {
         .assertHeader("Content-Encoding", "gzip")
         .assertHeader("Content-Length", bodySize)
         .assertRequestHeader("Accept-Encoding", "gzip");
+  }
+
+  @Test public void asyncResponseCanBeConsumedLater() throws Exception {
+    server.enqueue(new MockResponse().setBody("abc"));
+    server.enqueue(new MockResponse().setBody("def"));
+    server.play();
+
+    Request request = new Request.Builder()
+        .url(server.getUrl("/"))
+        .header("User-Agent", "SyncApiTest")
+        .build();
+
+    final BlockingQueue<Response> responseRef = new SynchronousQueue<>();
+    client.newCall(request).enqueue(new Callback() {
+      @Override public void onFailure(Request request, IOException e) {
+        throw new AssertionError();
+      }
+
+      @Override public void onResponse(Response response) throws IOException {
+        try {
+          responseRef.put(response);
+        } catch (InterruptedException e) {
+          throw new AssertionError();
+        }
+      }
+    });
+
+    Response response = responseRef.take();
+    assertEquals(200, response.code());
+    assertEquals("abc", response.body().string());
+
+    // Make another request just to confirm that that connection can be reused...
+    executeSynchronously(new Request.Builder().url(server.getUrl("/")).build()).assertBody("def");
+    assertEquals(0, server.takeRequest().getSequenceNumber()); // New connection.
+    assertEquals(1, server.takeRequest().getSequenceNumber()); // Connection reused.
+
+    // ... even before we close the response body!
+    response.body().close();
+  }
+
+  @Test public void userAgentIsOmittedByDefault() throws Exception {
+    server.enqueue(new MockResponse());
+    server.play();
+
+    executeSynchronously(new Request.Builder().url(server.getUrl("/")).build());
+
+    RecordedRequest recordedRequest = server.takeRequest();
+    assertNull(recordedRequest.getHeader("User-Agent"));
   }
 
   private RecordedResponse executeSynchronously(Request request) throws IOException {

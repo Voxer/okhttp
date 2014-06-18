@@ -122,6 +122,7 @@ public final class URLConnectionTest {
     Authenticator.setDefault(null);
     System.clearProperty("proxyHost");
     System.clearProperty("proxyPort");
+    System.clearProperty("http.agent");
     System.clearProperty("http.proxyHost");
     System.clearProperty("http.proxyPort");
     System.clearProperty("https.proxyHost");
@@ -2862,6 +2863,21 @@ public final class URLConnectionTest {
     assertEquals(0L, zeroLengthPayload.getBodySize());
   }
 
+  @Test public void unspecifiedRequestBodyContentTypeGetsDefault() throws Exception {
+    server.enqueue(new MockResponse());
+    server.play();
+
+    connection = client.open(server.getUrl("/"));
+    connection.setDoOutput(true);
+    connection.getOutputStream().write("abc".getBytes(UTF_8));
+    assertEquals(200, connection.getResponseCode());
+
+    RecordedRequest request = server.takeRequest();
+    assertEquals("application/x-www-form-urlencoded", request.getHeader("Content-Type"));
+    assertEquals("3", request.getHeader("Content-Length"));
+    assertEquals("abc", request.getUtf8Body());
+  }
+
   @Test public void setProtocols() throws Exception {
     server.enqueue(new MockResponse().setBody("A"));
     server.play();
@@ -2977,6 +2993,27 @@ public final class URLConnectionTest {
     RecordedRequest request = server.takeRequest();
     assertEquals("DELETE", request.getMethod());
     assertEquals("BODY", new String(request.getBody(), UTF_8));
+  }
+
+  @Test public void userAgentPicksUpHttpAgentSystemProperty() throws Exception {
+    server.enqueue(new MockResponse().setBody("abc"));
+    server.play();
+
+    System.setProperty("http.agent", "foo");
+    assertContent("abc", client.open(server.getUrl("/")));
+
+    RecordedRequest request = server.takeRequest();
+    assertEquals("foo", request.getHeader("User-Agent"));
+  }
+
+  @Test public void userAgentDefaultsToJavaVersion() throws Exception {
+    server.enqueue(new MockResponse().setBody("abc"));
+    server.play();
+
+    assertContent("abc", client.open(server.getUrl("/")));
+
+    RecordedRequest request = server.takeRequest();
+    assertTrue(request.getHeader("User-Agent").startsWith("Java"));
   }
 
   /** Returns a gzipped copy of {@code bytes}. */

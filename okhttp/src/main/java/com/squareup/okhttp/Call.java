@@ -146,13 +146,13 @@ public final class Call {
           responseCallback.onFailure(request, new IOException("Canceled"));
         } else {
           signalledCallback = true;
+          engine.releaseConnection();
           responseCallback.onResponse(response);
         }
       } catch (IOException e) {
-        if (signalledCallback) return; // Do not signal the callback twice!
+        if (signalledCallback) throw new RuntimeException(e); // Do not signal the callback twice!
         responseCallback.onFailure(request, e);
       } finally {
-        engine.close(); // Close the connection if it isn't already.
         dispatcher.finished(this);
       }
     }
@@ -167,11 +167,12 @@ public final class Call {
     RequestBody body = request.body();
     RetryableSink requestBodyOut = null;
     if (body != null) {
-      MediaType contentType = body.contentType();
-      if (contentType == null) throw new IllegalStateException("contentType == null");
-
       Request.Builder requestBuilder = request.newBuilder();
-      requestBuilder.header("Content-Type", contentType.toString());
+
+      MediaType contentType = body.contentType();
+      if (contentType != null) {
+        requestBuilder.header("Content-Type", contentType.toString());
+      }
 
       long contentLength = body.contentLength();
       if (contentLength != -1) {

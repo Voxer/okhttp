@@ -29,10 +29,10 @@ import okio.Buffer;
 public class RecordingCallback implements Callback {
   public static final long TIMEOUT_MILLIS = TimeUnit.SECONDS.toMillis(10);
 
-  private final List<RecordedResponse> responses = new ArrayList<RecordedResponse>();
+  private final List<RecordedResponse> responses = new ArrayList<>();
 
-  @Override public synchronized void onFailure(Request request, Throwable throwable) {
-    responses.add(new RecordedResponse(request, null, null, throwable));
+  @Override public synchronized void onFailure(Request request, IOException e) {
+    responses.add(new RecordedResponse(request, null, null, e));
     notifyAll();
   }
 

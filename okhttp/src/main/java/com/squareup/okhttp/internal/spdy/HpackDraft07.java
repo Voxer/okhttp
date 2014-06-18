@@ -1,3 +1,18 @@
+/*
+ * Copyright (C) 2013 Square, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.squareup.okhttp.internal.spdy;
 
 import com.squareup.okhttp.internal.BitArray;
@@ -98,7 +113,7 @@ final class HpackDraft07 {
   // http://tools.ietf.org/html/draft-ietf-httpbis-header-compression-07#section-3.2
   static final class Reader {
 
-    private final List<Header> emittedHeaders = new ArrayList<Header>();
+    private final List<Header> emittedHeaders = new ArrayList<>();
     private final BufferedSource source;
 
     private int maxHeaderTableByteCountSetting;
@@ -239,7 +254,7 @@ final class HpackDraft07 {
      * emitted headers.
      */
     List<Header> getAndReset() {
-      List<Header> result = new ArrayList<Header>(emittedHeaders);
+      List<Header> result = new ArrayList<>(emittedHeaders);
       emittedHeaders.clear();
       emittedReferencedHeaders.clear();
       return result;
@@ -397,8 +412,7 @@ final class HpackDraft07 {
   private static final Map<ByteString, Integer> NAME_TO_FIRST_INDEX = nameToFirstIndex();
 
   private static Map<ByteString, Integer> nameToFirstIndex() {
-    Map<ByteString, Integer> result =
-        new LinkedHashMap<ByteString, Integer>(STATIC_HEADER_TABLE.length);
+    Map<ByteString, Integer> result = new LinkedHashMap<>(STATIC_HEADER_TABLE.length);
     for (int i = 0; i < STATIC_HEADER_TABLE.length; i++) {
       if (!result.containsKey(STATIC_HEADER_TABLE[i].name)) {
         result.put(STATIC_HEADER_TABLE[i].name, i);

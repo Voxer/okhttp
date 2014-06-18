@@ -77,8 +77,8 @@ public final class SpdyConnection implements Closeable {
    * run on the callback executor.
    */
   private final IncomingStreamHandler handler;
-  private final Map<Integer, SpdyStream> streams = new HashMap<Integer, SpdyStream>();
   private final Map<Integer, SpdyStream> associatedStreams = new HashMap<Integer, SpdyStream>();
+  private final Map<Integer, SpdyStream> streams = new HashMap<>();
   private final String hostName;
   private int lastGoodStreamId;
   private int nextStreamId;
@@ -112,6 +112,7 @@ public final class SpdyConnection implements Closeable {
   // TODO: Do we want to dynamically adjust settings, or KISS and only set once?
   final Settings okHttpSettings = new Settings();
       // okHttpSettings.set(Settings.MAX_CONCURRENT_STREAMS, 0, max);
+  private static final int OKHTTP_CLIENT_WINDOW_SIZE = 16 * 1024 * 1024;
 
   /** Settings we receive from the peer. */
   // TODO: MWS will need to guard on this setting before attempting to push.
@@ -131,7 +132,11 @@ public final class SpdyConnection implements Closeable {
     client = builder.client;
     handler = builder.handler;
     // http://tools.ietf.org/html/draft-ietf-httpbis-http2-12#section-5.1.1
-    nextStreamId = builder.client ? 3 : 2; // 1 on client is reserved for Upgrade
+    nextStreamId = builder.client ? 1 : 2;
+    if (builder.client && protocol == Protocol.HTTP_2) {
+      nextStreamId += 2; // In HTTP/2, 1 on client is reserved for Upgrade.
+    }
+
     nextPingId = builder.client ? 1 : 2;
 
     // Flow control was designed more for servers, or proxies than edge clients.
@@ -139,7 +144,7 @@ public final class SpdyConnection implements Closeable {
     // thrashing window updates every 64KiB, yet small enough to avoid blowing
     // up the heap.
     if (builder.client) {
-      okHttpSettings.set(Settings.INITIAL_WINDOW_SIZE, 0, 16 * 1024 * 1024);
+      okHttpSettings.set(Settings.INITIAL_WINDOW_SIZE, 0, OKHTTP_CLIENT_WINDOW_SIZE);
     }
 
     hostName = builder.hostName;
@@ -368,7 +373,7 @@ public final class SpdyConnection implements Closeable {
       }
       pingId = nextPingId;
       nextPingId += 2;
-      if (pings == null) pings = new HashMap<Integer, Ping>();
+      if (pings == null) pings = new HashMap<>();
       pings.put(pingId, ping);
     }
     writePing(false, pingId, 0x4f4b6f6b /* ASCII "OKok" */, ping);
@@ -497,6 +502,10 @@ public final class SpdyConnection implements Closeable {
   public void sendConnectionPreface() throws IOException {
     frameWriter.connectionPreface();
     frameWriter.settings(okHttpSettings);
+    int windowSize = okHttpSettings.getInitialWindowSize(Settings.DEFAULT_INITIAL_WINDOW_SIZE);
+    if (windowSize != Settings.DEFAULT_INITIAL_WINDOW_SIZE) {
+      frameWriter.windowUpdate(0, windowSize - Settings.DEFAULT_INITIAL_WINDOW_SIZE);
+    }
   }
 
   public static class Builder {
@@ -846,8 +855,16 @@ public final class SpdyConnection implements Closeable {
       }
     });
   }
+  // Guarded by this.
+  private final Set<Integer> currentPushRequests = new LinkedHashSet<>();
 
   private void pushRequestLater(final int streamId, final List<Header> requestHeaders) {
-    // WTF Should I do with this?
+    synchronized (this) {
+      if (currentPushRequests.contains(streamId)) {
+        writeSynResetLater(streamId, ErrorCode.PROTOCOL_ERROR);
+        return;
+      }
+      currentPushRequests.add(streamId);
+    }
   }
 }

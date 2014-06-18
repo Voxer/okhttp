@@ -276,7 +276,7 @@ public final class HttpEngine {
             .priorResponse(stripBody(priorResponse))
             .protocol(Protocol.HTTP_1_1)
             .code(504)
-            .message("Gateway Timeout")
+            .message("Unsatisfiable Request (only-if-cached)")
             .body(EMPTY_BODY)
             .build();
       }
@@ -593,10 +593,6 @@ public final class HttpEngine {
   private Request networkRequest(Request request) throws IOException {
     Request.Builder result = request.newBuilder();
 
-    if (request.header("User-Agent") == null) {
-      result.header("User-Agent", getDefaultUserAgent());
-    }
-
     if (request.header("Host") == null) {
       result.header("Host", hostHeader(request.url()));
     }
@@ -609,10 +605,6 @@ public final class HttpEngine {
     if (request.header("Accept-Encoding") == null) {
       transparentGzip = true;
       result.header("Accept-Encoding", "gzip");
-    }
-
-    if (hasRequestBody() && request.header("Content-Type") == null) {
-      result.header("Content-Type", "application/x-www-form-urlencoded");
     }
 
     CookieHandler cookieHandler = client.getCookieHandler();
@@ -809,17 +801,19 @@ public final class HttpEngine {
   private Request tunnelRequest(Connection connection, Request request) throws IOException {
     if (!connection.getRoute().requiresTunnel()) return null;
 
-    String userAgent = request.header("User-Agent");
-    if (userAgent == null) userAgent = getDefaultUserAgent();
-
     String host = request.url().getHost();
     int port = getEffectivePort(request.url());
     String authority = (port == getDefaultPort("https")) ? host : (host + ":" + port);
     Request.Builder result = new Request.Builder()
         .url(new URL("https", host, port, "/"))
         .header("Host", authority)
-        .header("User-Agent", userAgent)
         .header("Proxy-Connection", "Keep-Alive"); // For HTTP/1.0 proxies like Squid.
+
+    // Copy over the User-Agent header if it exists.
+    String userAgent = request.header("User-Agent");
+    if (userAgent != null) {
+      result.header("User-Agent", userAgent);
+    }
 
     // Copy over the Proxy-Authorization header if it exists.
     String proxyAuthorization = request.header("Proxy-Authorization");

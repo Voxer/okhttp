@@ -33,8 +33,8 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
     <!-- Compilation -->
-    <java.version>1.6</java.version>
-    <okio.version>0.9.0</okio.version>
+    <java.version>1.7</java.version>
+    <okio.version>1.0.0</okio.version>
     <!-- Targetted to jdk7u60-b13; Oracle jdk7u55-b13. -->
     <npn.version>1.1.7.v20140316</npn.version>
     <!-- Targetted to OpenJDK 8 b132 -->
@@ -217,7 +217,7 @@
         <jdk>1.7</jdk>
       </activation>
       <properties>
-        <bootclasspath>${settings.localRepository}/org/mortbay/jetty/npn/npn-boot/${npn.version}/npn-boot-${npn.version}.jar</bootclasspath>
+        <bootclasspathPrefix>${settings.localRepository}/org/mortbay/jetty/npn/npn-boot/${npn.version}/npn-boot-${npn.version}.jar</bootclasspathPrefix>
       </properties>
       <build>
         <pluginManagement>
@@ -226,7 +226,7 @@
               <groupId>org.apache.maven.plugins</groupId>
               <artifactId>maven-surefire-plugin</artifactId>
               <configuration>
-                <argLine>-Xbootclasspath/p:${bootclasspath}</argLine>
+                <argLine>-Xbootclasspath/p:${bootclasspathPrefix}</argLine>
               </configuration>
               <dependencies>
                 <dependency>
@@ -246,7 +246,7 @@
         <jdk>1.8</jdk>
       </activation>
       <properties>
-        <bootclasspath>${settings.localRepository}/org/mortbay/jetty/alpn/alpn-boot/${alpn.version}/alpn-boot-${alpn.version}.jar</bootclasspath>
+        <bootclasspathPrefix>${settings.localRepository}/org/mortbay/jetty/alpn/alpn-boot/${alpn.version}/alpn-boot-${alpn.version}.jar</bootclasspathPrefix>
       </properties>
       <build>
         <pluginManagement>
@@ -255,7 +255,7 @@
               <groupId>org.apache.maven.plugins</groupId>
               <artifactId>maven-surefire-plugin</artifactId>
               <configuration>
-                <argLine>-Xbootclasspath/p:${bootclasspath}</argLine>
+                <argLine>-Xbootclasspath/p:${bootclasspathPrefix}</argLine>
               </configuration>
               <dependencies>
                 <dependency>

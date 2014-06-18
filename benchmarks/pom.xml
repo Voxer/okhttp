@@ -88,7 +88,7 @@
             <argument>-Xmx512m</argument>
             <commandlineArgs>-Xbootclasspath/p:${bootclasspath}</commandlineArgs>
             <argument>-classpath</argument>
-            <classpath/>
+            <classpath />
             <argument>com.squareup.okhttp.benchmarks.Benchmark</argument>
           </arguments>
         </configuration>
