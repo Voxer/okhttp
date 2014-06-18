@@ -1410,7 +1410,6 @@ public final class Spdy3ConnectionTest {
   static int roundUp(int num, int divisor) {
     return (num + divisor - 1) / divisor;
   }
-<<<<<<< HEAD:okhttp-tests/src/test/java/com/squareup/okhttp/internal/spdy/SpdyConnectionTest.java
 
   static final SpdyPushObserver IGNORE = new SpdyPushObserver() {
 
@@ -1455,6 +1454,4 @@ public final class Spdy3ConnectionTest {
       return false;
     }
   }
-=======
->>>>>>> upstream/master:okhttp-tests/src/test/java/com/squareup/okhttp/internal/spdy/Spdy3ConnectionTest.java
 }
