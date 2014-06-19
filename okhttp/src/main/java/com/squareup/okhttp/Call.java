@@ -238,6 +238,14 @@ public final class Call {
     }
   }
 
+  /**
+   * Returns the latest response headers of a given request.
+   * Used to read trailers if we know request body has been consumed
+   */
+  public Headers getResponseHeaders() throws IOException {
+    return engine.getResponseHeaders();
+  }
+
   private static class RealResponseBody extends ResponseBody {
     private final Response response;
     private final BufferedSource source;
