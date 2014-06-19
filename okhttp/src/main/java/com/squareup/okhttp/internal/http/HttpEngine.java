@@ -1004,6 +1004,15 @@ public final class HttpEngine {
   }
 
   /**
+   * Returns the latest response headers of a given request.
+   * Used to read trailers if we know request body has been consumed
+   */
+  public Headers getResponseHeaders() throws IOException {
+    Response.Builder builder = transport.readResponseHeaders().request(networkRequest);
+    return builder.build().headers();
+  }
+
+  /**
    * Returns true if {@code cached} should be used; false if {@code network}
    * response should be used.
    */

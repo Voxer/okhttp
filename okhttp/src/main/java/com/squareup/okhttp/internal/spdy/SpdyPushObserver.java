@@ -50,15 +50,13 @@ public interface SpdyPushObserver {
    * The response headers corresponding to a pushed request.  When {@code last}
    * is true, there are no data frames to follow.
    *
-   * @param streamId server-initiated stream ID: an even number.
-   * @param responseHeaders minimally includes {@code :status}.
-   * @param last when true, there is no response data.
+   * @param associated parent stream.
+   * @param push the pushed stream.
    */
   boolean onPush(SpdyStream associated, SpdyStream push);
 
   /**
    * Update with any newly received headers
-   * 
    * @param stream - updated or new headers
    */
   void setHeaders(List<Header> headers);
