@@ -153,16 +153,12 @@ public final class SpdyConnection implements Closeable {
 
     if (protocol == Protocol.HTTP_2) {
       variant = new Http20Draft13();
-      // Like newSingleThreadExecutor, except lazy creates the thread.
-      pushExecutor = new ThreadPoolExecutor(0, 1,
-          0L, TimeUnit.MILLISECONDS,
-          new LinkedBlockingQueue<Runnable>(),
-          Util.threadFactory(String.format("OkHttp %s Push Observer", hostName), true));
     } else if (protocol == Protocol.SPDY_3) {
       variant = new Spdy3();
     } else {
       throw new AssertionError(protocol);
     }
+
     // Like newSingleThreadExecutor, except lazy creates the thread.
     pushExecutor = new ThreadPoolExecutor(0, 1,
         0L, TimeUnit.MILLISECONDS,
