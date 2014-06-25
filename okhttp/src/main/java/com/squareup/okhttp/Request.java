@@ -330,6 +330,11 @@ public final class Request {
       return this;
     }
 
+    public Builder dontRetry(boolean dontRetry) {
+      this.dontRetry = dontRetry;
+      return this;
+    }
+
     public Request build() {
       if (url == null) throw new IllegalStateException("url == null");
       return new Request(this);
