@@ -416,10 +416,9 @@ public final class OkHttpClient implements Cloneable {
    */
   public OkHttpClient setProtocols(List<Protocol> protocols) {
     protocols = Util.immutableList(protocols);
-    // JSheehy - disabling this as I don't want it to fall back to http 1.1
-    // if (!protocols.contains(Protocol.HTTP_1_1)) {
-    //   throw new IllegalArgumentException("protocols doesn't contain http/1.1: " + protocols);
-    // }
+    if (!protocols.contains(Protocol.HTTP_1_1)) {
+      throw new IllegalArgumentException("protocols doesn't contain http/1.1: " + protocols);
+    }
     if (protocols.contains(null)) {
       throw new IllegalArgumentException("protocols must not contain null");
     }
