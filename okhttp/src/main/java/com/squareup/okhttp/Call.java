@@ -207,12 +207,13 @@ public final class Call {
         // JSheehy - 2014-06-25 - check the request.dontRetry -  
         // we're using SPDY only and need to control retries ourselves for 
         // resumed uplaods etc.
-        HttpEngine retryEngine = engine.recover(e, null);
-        if (!request.dontRetry() && retryEngine != null) {
-          engine = retryEngine;
-          continue;
+        if(!request.dontRetry()) {
+          HttpEngine retryEngine = engine.recover(e, null);
+          if (retryEngine != null) {
+            engine = retryEngine;
+            continue;
+          }
         }
-
         // Give up; recovery is not possible.
         throw e;
       }
