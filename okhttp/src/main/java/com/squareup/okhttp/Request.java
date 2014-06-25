@@ -37,6 +37,7 @@ public final class Request {
   private final PushObserver pushObserver;
   private final long readTimeout;
   private final long writeTimeout;
+  private final boolean dontRetry;
 
   private Headers trailers;
 
@@ -54,6 +55,7 @@ public final class Request {
     this.pushObserver = builder.pushObserver;
     this.readTimeout = builder.readTimeout;
     this.writeTimeout = builder.writeTimeout;
+    this.dontRetry = builder.dontRetry;
   }
 
   public HttpUrl httpUrl() {
@@ -130,6 +132,10 @@ public final class Request {
     return trailers;
   }
 
+  public boolean dontRetry() {
+    return dontRetry;
+  }
+
   /**
    * Returns the cache control directives for this response. This is never null,
    * even if this response contains no {@code Cache-Control} header.
@@ -163,6 +169,7 @@ public final class Request {
     private PushObserver pushObserver = null;
     private long readTimeout;
     private long writeTimeout;
+    private boolean dontRetry;
 
     public Builder() {
       this.method = "GET";
@@ -179,6 +186,7 @@ public final class Request {
       this.pushObserver = request.pushObserver;
       this.readTimeout = request.readTimeout;
       this.writeTimeout = request.writeTimeout;
+      this.dontRetry = request.dontRetry;
     }
 
     public Builder url(HttpUrl url) {

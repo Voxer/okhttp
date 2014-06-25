@@ -285,9 +285,11 @@ public class Call {
         // Give up; recovery is not possible.
         throw e.getLastConnectException();
       } catch (IOException e) {
-        // An attempt to communicate with a server failed. The request may have been sent.
+        // JSheehy - 2014-06-25 - check the request.dontRetry -  
+        // we're using SPDY only and need to control retries ourselves for 
+        // resumed uplaods etc.
         HttpEngine retryEngine = engine.recover(e, null);
-        if (retryEngine != null) {
+        if (!request.dontRetry() && retryEngine != null) {
           engine = retryEngine;
           continue;
         }
