@@ -52,6 +52,9 @@ public interface Transport {
   /** This should update the HTTP engine's sentRequestMillis field. */
   void writeRequestHeaders(Request request) throws IOException;
 
+  /** Once body has been written, we can write trailers */
+  void writeRequestTrailers(Request request) throws IOException;
+
   /**
    * Sends the request body returned by {@link #createRequestBody} to the
    * remote peer.

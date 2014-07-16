@@ -250,6 +250,13 @@ public final class Call {
     return engine.getResponseHeaders();
   }
 
+  /**
+   * Attach some request trailers
+   */
+  public void setRequestTrailers(Headers trailers) throws IOException {
+    engine.setRequestTrailers(trailers);
+  }
+
   private static class RealResponseBody extends ResponseBody {
     private final Response response;
     private final BufferedSource source;

@@ -329,6 +329,13 @@ public final class SpdyConnection implements Closeable {
   }
 
   /**
+   * Write headers into the stream - can be used for trailers
+   */
+  public void writeHeaders(int streamId, List<Header> headerBlock) throws IOException {
+    frameWriter.headers(streamId, headerBlock);
+  }
+
+  /**
    * {@code delta} will be negative if a settings frame initial window is
    * smaller than the last.
    */

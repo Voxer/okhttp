@@ -41,6 +41,7 @@ public final class Request {
   private final long writeTimeout;
   private final boolean dontRetry;
 
+  // Ok, I violated the immutability to put this here...
   private Headers trailers;
 
   private volatile URL url; // Lazily initialized.

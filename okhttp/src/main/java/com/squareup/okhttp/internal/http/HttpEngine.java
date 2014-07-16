@@ -670,6 +670,11 @@ public final class HttpEngine {
       transport.writeRequestHeaders(networkRequest);
     }
 
+    Headers trailers = networkRequest.trailers();
+    if (trailers != null) {
+      transport.writeRequestTrailers(networkRequest);
+    }
+
     if (requestBodyOut != null) {
       if (bufferedRequestBody != null) {
         // This also closes the wrapped requestBodyOut.
@@ -682,6 +687,7 @@ public final class HttpEngine {
       }
     }
 
+    // The below ends the sink
     transport.flushRequest();
 
     networkResponse = transport.readResponseHeaders()
@@ -746,6 +752,13 @@ public final class HttpEngine {
   public Headers getResponseHeaders() throws IOException {
     Response.Builder builder = transport.readResponseHeaders().request(networkRequest);
     return builder.build().headers();
+  }
+
+  /**
+   * Similarly, this is used to write a trailer to the end of a given request
+   */
+  public void setRequestTrailers(Headers trailers) {
+    networkRequest.setTrailers(trailers);
   }
 
   /**

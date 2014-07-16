@@ -97,6 +97,10 @@ public final class HttpTransport implements Transport {
     httpConnection.writeRequest(request.headers(), requestLine);
   }
 
+  @Override public void writeRequestTrailers(Request request) throws IOException {
+    // TODO if requiried
+  }
+
   @Override public Response.Builder readResponseHeaders() throws IOException {
     return httpConnection.readResponse();
   }

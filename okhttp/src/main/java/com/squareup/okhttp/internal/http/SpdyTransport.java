@@ -146,6 +146,21 @@ public final class SpdyTransport implements Transport {
     throw new UnsupportedOperationException();
   }
 
+  @Override public void writeRequestTrailers(Request request) throws IOException {
+    // Convert to writeNameValueBlock
+    Headers trailers = request.trailers();
+    List<Header> result = new ArrayList<>(trailers.size() + 10);
+    Set<ByteString> names = new LinkedHashSet<ByteString>();
+    for (int i = 0; i < trailers.size(); i++) {
+      // header names must be lowercase.
+      ByteString name = ByteString.encodeUtf8(trailers.name(i).toLowerCase(Locale.US));
+      String value = trailers.value(i);
+      result.add(new Header(name, value));
+    }
+    // Use connection to write directly with stream ID.
+    spdyConnection.writeHeaders(stream.getId(), result);
+  }
+
   @Override public void flushRequest() throws IOException {
     stream.getSink().close();
   }
