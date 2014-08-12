@@ -146,11 +146,11 @@ public class Platform {
       // Attempt to find Android 4.1+ APIs.
       Method setNpnProtocols = null;
       Method getNpnSelectedProtocol = null;
-      try {
-        setNpnProtocols = openSslSocketClass.getMethod("setNpnProtocols", byte[].class);
-        getNpnSelectedProtocol = openSslSocketClass.getMethod("getNpnSelectedProtocol");
-      } catch (NoSuchMethodException ignored) {
-      }
+      // try {
+      //   setNpnProtocols = openSslSocketClass.getMethod("setNpnProtocols", byte[].class);
+      //   getNpnSelectedProtocol = openSslSocketClass.getMethod("getNpnSelectedProtocol");
+      // } catch (NoSuchMethodException ignored) {
+      // }
 
       return new Android(openSslSocketClass, setUseSessionTickets, setHostname,
           trafficStatsTagSocket, trafficStatsUntagSocket, setNpnProtocols,
