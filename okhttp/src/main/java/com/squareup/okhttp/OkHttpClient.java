@@ -544,12 +544,12 @@ public class OkHttpClient implements Cloneable {
    */
   public OkHttpClient setProtocols(List<Protocol> protocols) {
     protocols = Util.immutableList(protocols);
-    if (!protocols.contains(Protocol.HTTP_1_1)) {
-      throw new IllegalArgumentException("protocols doesn't contain http/1.1: " + protocols);
-    }
-    if (protocols.contains(Protocol.HTTP_1_0)) {
-      throw new IllegalArgumentException("protocols must not contain http/1.0: " + protocols);
-    }
+    //if (!protocols.contains(Protocol.HTTP_1_1)) {
+    //  throw new IllegalArgumentException("protocols doesn't contain http/1.1: " + protocols);
+    //}
+    //if (protocols.contains(Protocol.HTTP_1_0)) {
+    //  throw new IllegalArgumentException("protocols must not contain http/1.0: " + protocols);
+    //}
     if (protocols.contains(null)) {
       throw new IllegalArgumentException("protocols must not contain null");
     }
