@@ -18,8 +18,9 @@ package com.squareup.okhttp;
 import com.squareup.okhttp.Call.AsyncCall;
 import com.squareup.okhttp.internal.Util;
 import com.squareup.okhttp.internal.http.HttpEngine;
-import java.util.ArrayDeque;
-import java.util.Deque;
+import com.squareup.okhttp.internal.voxerUtil.ArrayDeque;
+import com.squareup.okhttp.internal.voxerUtil.Deque;
+
 import java.util.Iterator;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
