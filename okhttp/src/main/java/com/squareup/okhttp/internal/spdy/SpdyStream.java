@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.LinkedHashSet;
 import okio.AsyncTimeout;
 import okio.Buffer;
 import okio.BufferedSource;
@@ -66,6 +68,9 @@ public final class SpdyStream {
   private final SpdyTimeout readTimeout = new SpdyTimeout();
   private final SpdyTimeout writeTimeout = new SpdyTimeout();
   public SpdyPushObserver pushObserver = null;
+
+  // Track these so we can cancel them
+  private final Set<SpdyStream> pushedStreams = new LinkedHashSet<SpdyStream>();
 
   /**
    * The reason why this stream was abnormally closed. If there are multiple
@@ -128,6 +133,13 @@ public final class SpdyStream {
 
   public List<Header> getRequestHeaders() {
     return requestHeaders;
+  }
+
+  /** 
+   * Adds to pushed stream list
+   */
+  public synchronized void addToPushedStreams(SpdyStream stream) {
+    pushedStreams.add(stream);
   }
 
   /**
@@ -219,6 +231,12 @@ public final class SpdyStream {
   public void close(ErrorCode rstStatusCode) throws IOException {
     if (!closeInternal(rstStatusCode)) {
       return; // Already closed.
+    }
+    // Close down dependant pushed streams
+    for(SpdyStream pushed : pushedStreams) {
+      int pushedId = pushed.getId();
+      pushed.getSource().close();
+      pushedStreams.remove(pushedId);
     }
     connection.writeSynReset(id, rstStatusCode);
   }

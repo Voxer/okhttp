@@ -852,6 +852,8 @@ public final class SpdyConnection implements Closeable {
             streamPushObserver = pushObserver;
           }
           synchronized (push) {
+            // Add to pushed streams
+            associated.addToPushedStreams(push);
             pushId = push.getId();
             cancel = streamPushObserver.onPush(associated, push);
           }
@@ -864,17 +866,5 @@ public final class SpdyConnection implements Closeable {
         }
       }
     });
-  }
-  // Guarded by this.
-  private final Set<Integer> currentPushRequests = new LinkedHashSet<>();
-
-  private void pushRequestLater(final int streamId, final List<Header> requestHeaders) {
-    synchronized (this) {
-      if (currentPushRequests.contains(streamId)) {
-        writeSynResetLater(streamId, ErrorCode.PROTOCOL_ERROR);
-        return;
-      }
-      currentPushRequests.add(streamId);
-    }
   }
 }
