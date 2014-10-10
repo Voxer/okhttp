@@ -865,6 +865,8 @@ public final class SpdyConnection implements Closeable {
             streamPushObserver = pushObserver;
           }
           synchronized (push) {
+            // Add to pushed streams
+            associated.addToPushedStreams(push);
             pushId = push.getId();
             cancel = streamPushObserver.onPush(associated, push);
           }
@@ -877,9 +879,5 @@ public final class SpdyConnection implements Closeable {
         }
       }
     });
-  }
-
-  private void pushRequestLater(final int streamId, final List<Header> requestHeaders) {
-    // WTF Should I do with this?
   }
 }
