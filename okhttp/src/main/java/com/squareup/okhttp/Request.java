@@ -17,6 +17,8 @@ package com.squareup.okhttp;
 
 import com.squareup.okhttp.internal.http.HttpMethod;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.util.List;
@@ -27,6 +29,7 @@ import java.util.List;
  */
 public final class Request {
   private final HttpUrl url;
+  private final InetAddress hostIP;
   private final String method;
   private final Headers headers;
   private final RequestBody body;
@@ -39,6 +42,7 @@ public final class Request {
 
   private Request(Builder builder) {
     this.url = builder.url;
+    this.hostIP = builder.hostIP;
     this.method = builder.method;
     this.headers = builder.headers.build();
     this.body = builder.body;
@@ -66,6 +70,10 @@ public final class Request {
 
   public String urlString() {
     return url.toString();
+  }
+
+  public InetAddress hostIP() {
+    return hostIP;
   }
 
   public String method() {
@@ -125,6 +133,7 @@ public final class Request {
 
   public static class Builder {
     private HttpUrl url;
+    private InetAddress hostIP;
     private String method;
     private Headers.Builder headers;
     private RequestBody body;
@@ -138,6 +147,7 @@ public final class Request {
 
     private Builder(Request request) {
       this.url = request.url;
+      this.hostIP = request.hostIP;
       this.method = request.method;
       this.body = request.body;
       this.tag = request.tag;
@@ -171,6 +181,11 @@ public final class Request {
       HttpUrl parsed = HttpUrl.get(url);
       if (parsed == null) throw new IllegalArgumentException("unexpected url: " + url);
       return url(parsed);
+    }
+
+    public Builder hostIP(InetAddress hostIP) {
+      this.hostIP = hostIP;
+      return this;
     }
 
     /**

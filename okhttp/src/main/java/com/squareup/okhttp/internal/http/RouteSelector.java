@@ -184,9 +184,15 @@ public final class RouteSelector {
           + "; port is out of range");
     }
 
-    // Try each address for best behavior in mixed IPv4/IPv6 environments.
-    for (InetAddress inetAddress : network.resolveInetAddresses(socketHost)) {
-      inetSocketAddresses.add(new InetSocketAddress(inetAddress, socketPort));
+    // Override IP specified ?
+    InetAddress hostIP = address.getHostIP();
+    if (hostIP != null) {
+      inetSocketAddresses.add(new InetSocketAddress(hostIP, socketPort));
+    } else {
+      // Try each address for best behavior in mixed IPv4/IPv6 environments.
+      for (InetAddress inetAddress : network.resolveInetAddresses(socketHost)) {
+        inetSocketAddresses.add(new InetSocketAddress(inetAddress, socketPort));
+      }
     }
 
     nextInetSocketAddressIndex = 0;

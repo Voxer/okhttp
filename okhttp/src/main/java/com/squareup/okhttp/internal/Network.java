@@ -28,7 +28,12 @@ public interface Network {
       if (host == null) throw new UnknownHostException("host == null");
       return InetAddress.getAllByName(host);
     }
+    @Override public InetAddress getByAddress(byte[] address) throws UnknownHostException {
+       if (address == null) throw new UnknownHostException("address == null");
+       return InetAddress.getByAddress(address);
+    }
   };
 
   InetAddress[] resolveInetAddresses(String host) throws UnknownHostException;
+  InetAddress getByAddress(byte[] address) throws UnknownHostException;
 }

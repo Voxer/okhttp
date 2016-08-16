@@ -37,6 +37,7 @@ import com.squareup.okhttp.internal.Version;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.net.CookieHandler;
+import java.net.InetAddress;
 import java.net.ProtocolException;
 import java.net.Proxy;
 import java.net.URL;
@@ -1161,7 +1162,7 @@ public final class HttpEngine {
       certificatePinner = client.getCertificatePinner();
     }
 
-    return new Address(uriHost, getEffectivePort(request.url()),
+    return new Address(uriHost, request.hostIP(), getEffectivePort(request.url()),
         client.getSocketFactory(), sslSocketFactory, hostnameVerifier, certificatePinner,
         client.getAuthenticator(), client.getProxy(), client.getProtocols(),
         client.getConnectionSpecs(), client.getProxySelector());
