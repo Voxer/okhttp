@@ -158,6 +158,10 @@ public final class Connection {
         ? Protocol.HTTP_1_1 : connectedSocket.alpnProtocol;
 
     try {
+
+      // Throw in nodelay
+      socket.setTcpNoDelay(true);
+
       if (protocol == Protocol.SPDY_3 || protocol == Protocol.HTTP_2) {
         socket.setSoTimeout(0); // SPDY timeouts are set per-stream.
         spdyConnection = new SpdyConnection.Builder(route.address.uriHost, true, socket)
