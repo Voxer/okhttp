@@ -157,6 +157,11 @@ public final class Connection {
     protocol = connectedSocket.alpnProtocol == null
         ? Protocol.HTTP_1_1 : connectedSocket.alpnProtocol;
 
+    List<Protocol> protocols = route.address.protocols;
+    if (protocols.size() == 1) {
+      protocol = protocols.get(0); // Use application provided protocol if only one allowed.
+    }
+
     try {
 
       // Throw in nodelay
