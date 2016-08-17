@@ -1307,6 +1307,140 @@ public final class Spdy3ConnectionTest {
     assertStreamData("robot", stream.getSource());
   }
 
+  @Test public void pushPromiseStream() throws Exception {
+    peer.setVariantAndClient(HTTP_2, false);
+
+    // write the mocking script
+    peer.acceptFrame(); // SYN_STREAM
+    peer.sendFrame().synReply(false, 3, headerEntries("a", "android"));
+    final List<Header> expectedRequestHeaders = Arrays.asList(
+        new Header(Header.TARGET_METHOD, "GET"),
+        new Header(Header.TARGET_SCHEME, "https"),
+        new Header(Header.TARGET_AUTHORITY, "squareup.com"),
+        new Header(Header.TARGET_PATH, "/cached")
+    );
+    peer.sendFrame().pushPromise(3, 2, expectedRequestHeaders);
+    final List<Header> expectedResponseHeaders = Arrays.asList(
+        new Header(Header.RESPONSE_STATUS, "200")
+    );
+    peer.sendFrame().synReply(true, 2, expectedResponseHeaders);
+    peer.sendFrame().data(true, 3, data(0));
+    peer.play();
+
+    RecordingPushObserver observer = new RecordingPushObserver();
+
+    // play it back
+    SpdyConnection connection = connectionBuilder(peer, HTTP_2)
+        .pushObserver(observer).build();
+    SpdyStream client = connection.newStream(headerEntries("b", "banana"), false, true);
+    assertEquals(-1, client.getSource().read(new Buffer(), 1));
+
+    // verify the peer received what was expected
+    assertEquals(TYPE_HEADERS, peer.takeFrame().type);
+
+    assertEquals(expectedRequestHeaders, observer.takeEvent());
+    assertEquals(expectedResponseHeaders, observer.takeEvent());
+  }
+
+  @Test public void pushStream() throws Exception {
+    peer.setVariantAndClient(SPDY3, false);
+
+    // write the mocking script
+    peer.acceptFrame(); // SYN_STREAM
+    peer.sendFrame().synReply(false, 3, headerEntries("a", "android"));
+    final List<Header> expectedPushHeaders = Arrays.asList(
+        new Header(Header.TARGET_SCHEME, "https"),
+        new Header(Header.TARGET_AUTHORITY, "squareup.com"),
+        new Header(Header.TARGET_PATH, "/cached")
+    );
+    peer.sendFrame().synStream(false, true, 2, 3, expectedPushHeaders);
+    peer.sendFrame().data(true, 3, data(0));
+    peer.sendFrame().data(true, 2, new Buffer().writeUtf8("robot"));
+    peer.play();
+
+    RecordingPushObserver observer = new RecordingPushObserver();
+
+    // play it back
+    SpdyConnection connection = connectionBuilder(peer, SPDY3)
+        .pushObserver(observer).build();
+    SpdyStream client = connection.newStream(headerEntries("b", "banana"), false, true);
+    assertEquals(-1, client.getSource().read(new Buffer(), 1));
+
+    // verify the peer received what was expected
+    assertEquals(TYPE_HEADERS, peer.takeFrame().type);
+
+    assertEquals(expectedPushHeaders, observer.takeEvent());
+    assertEquals("robot", observer.takeEvent());
+  }
+
+  @Test public void doublePushPromise() throws Exception {
+    peer.setVariantAndClient(HTTP_2, false);
+
+    // write the mocking script
+    peer.sendFrame().pushPromise(3, 2, headerEntries("a", "android"));
+    peer.acceptFrame(); // SYN_REPLY
+    peer.sendFrame().pushPromise(3, 2, headerEntries("b", "banana"));
+    peer.acceptFrame(); // RST_STREAM
+    peer.play();
+
+    // play it back
+    SpdyConnection connection = connectionBuilder(peer, HTTP_2).build();
+    connection.newStream(headerEntries("b", "banana"), false, true);
+
+    // verify the peer received what was expected
+    assertEquals(TYPE_HEADERS, peer.takeFrame().type);
+    assertEquals(PROTOCOL_ERROR, peer.takeFrame().errorCode);
+  }
+
+  @Test public void pushPromiseStreamsAutomaticallyCancel() throws Exception {
+    peer.setVariantAndClient(HTTP_2, false);
+
+    // write the mocking script
+    peer.sendFrame().pushPromise(3, 2, Arrays.asList(
+        new Header(Header.TARGET_METHOD, "GET"),
+        new Header(Header.TARGET_SCHEME, "https"),
+        new Header(Header.TARGET_AUTHORITY, "squareup.com"),
+        new Header(Header.TARGET_PATH, "/cached")
+    ));
+    peer.sendFrame().synReply(true, 2, Arrays.asList(
+        new Header(Header.RESPONSE_STATUS, "200")
+    ));
+    peer.acceptFrame(); // RST_STREAM
+    peer.play();
+
+    // play it back
+    connectionBuilder(peer, HTTP_2)
+        .pushObserver(SpdyPushObserver.CANCEL).build();
+
+    // verify the peer received what was expected
+    MockSpdyPeer.InFrame rstStream = peer.takeFrame();
+    assertEquals(TYPE_RST_STREAM, rstStream.type);
+    assertEquals(2, rstStream.streamId);
+    assertEquals(CANCEL, rstStream.errorCode);
+  }
+
+  private SpdyConnection sendHttp2SettingsAndCheckForAck(boolean client, Settings settings)
+      throws IOException, InterruptedException {
+    peer.setVariantAndClient(HTTP_2, client);
+    peer.sendFrame().settings(settings);
+    peer.acceptFrame(); // ACK
+    peer.acceptFrame(); // PING
+    peer.sendFrame().ping(true, 1, 0);
+    peer.play();
+
+    // play it back
+    SpdyConnection connection = connection(peer, HTTP_2);
+
+    // verify the peer received the ACK
+    MockSpdyPeer.InFrame ackFrame = peer.takeFrame();
+    assertEquals(TYPE_SETTINGS, ackFrame.type);
+    assertEquals(0, ackFrame.streamId);
+    assertTrue(ackFrame.ack);
+
+    connection.ping().roundTripTime(); // Ensure that settings have been applied before returning.
+    return connection;
+  }
+
   private SpdyConnection connection(MockSpdyPeer peer, Variant variant) throws IOException {
     return connectionBuilder(peer, variant).build();
   }
@@ -1365,5 +1499,49 @@ public final class Spdy3ConnectionTest {
 
   static int roundUp(int num, int divisor) {
     return (num + divisor - 1) / divisor;
+  }
+
+  static final SpdyPushObserver IGNORE = new SpdyPushObserver() {
+
+    @Override public synchronized boolean onPromise(int streamId, List<Header> requestHeaders) {
+      return false;
+    }
+
+    @Override public synchronized boolean onPush(SpdyStream associated, SpdyStream push) {
+      return false;
+    }
+  };
+
+  private static class RecordingPushObserver implements SpdyPushObserver {
+    final List<Object> events = new ArrayList<Object>();
+
+    public synchronized Object takeEvent() throws InterruptedException {
+      while (events.isEmpty()) {
+        wait();
+      }
+      return events.remove(0);
+    }
+
+    @Override public synchronized boolean onPromise(int streamId, List<Header> requestHeaders) {
+      assertEquals(2, streamId);
+      events.add(requestHeaders);
+      notifyAll();
+      return false;
+    }
+
+    @Override public synchronized boolean onPush(SpdyStream associated, SpdyStream push) {
+      assertEquals(2, push.getId());
+      events.add(push.getRequestHeaders());
+      Source in = push.getSource();
+      try {
+        String data = Okio.buffer(in).readByteString(5).utf8();
+
+        events.add(data);
+        notifyAll();
+      } catch (IOException expected) {
+        // Just don't push anything to events
+      }
+      return false;
+    }
   }
 }

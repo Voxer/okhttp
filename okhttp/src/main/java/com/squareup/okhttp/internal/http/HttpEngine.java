@@ -729,6 +729,15 @@ public final class HttpEngine {
     return result.build();
   }
 
+  public boolean isTransparentGzip() {
+    return transparentGzip;
+  }
+
+  public static String getDefaultUserAgent() {
+    String agent = System.getProperty("http.agent");
+    return agent != null ? agent : ("Java" + System.getProperty("java.version"));
+  }
+
   public static String hostHeader(URL url) {
     return getEffectivePort(url) != getDefaultPort(url.getProtocol())
         ? url.getHost() + ":" + url.getPort()

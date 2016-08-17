@@ -18,6 +18,7 @@ package com.squareup.okhttp.internal.http;
 
 import com.squareup.okhttp.Headers;
 import com.squareup.okhttp.Protocol;
+import com.squareup.okhttp.PushObserver;
 import com.squareup.okhttp.Request;
 import com.squareup.okhttp.Response;
 import com.squareup.okhttp.ResponseBody;
@@ -25,7 +26,9 @@ import com.squareup.okhttp.internal.Util;
 import com.squareup.okhttp.internal.spdy.ErrorCode;
 import com.squareup.okhttp.internal.spdy.Header;
 import com.squareup.okhttp.internal.spdy.SpdyConnection;
+import com.squareup.okhttp.internal.spdy.SpdyPushObserver;
 import com.squareup.okhttp.internal.spdy.SpdyStream;
+
 import java.io.IOException;
 import java.net.ProtocolException;
 import java.util.ArrayList;
@@ -34,7 +37,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+
+import okio.BufferedSource;
 import okio.ByteString;
+import okio.GzipSource;
 import okio.Okio;
 import okio.Sink;
 
@@ -90,6 +96,33 @@ public final class SpdyTransport implements Transport {
         writeNameValueBlock(request, spdyConnection.getProtocol(), version), permitsRequestBody,
         hasResponseBody);
     stream.readTimeout().timeout(httpEngine.client.getReadTimeout(), TimeUnit.MILLISECONDS);
+
+    final PushObserver pushObserver = request.pushObserver();
+    if (pushObserver != null) {
+      stream.pushObserver = new SpdyPushObserver() {
+        @Override public synchronized boolean onPromise(int streamId, List<Header> requestHeaders) {
+          return true;
+        }
+
+        @Override public synchronized boolean onPush(SpdyStream associated, SpdyStream push) {
+          try {
+            Request pushReq = readPushNameValueBlock(
+                push.getRequestHeaders(),
+                spdyConnection.getProtocol()).build();
+            BufferedSource buffer;
+            if (httpEngine.isTransparentGzip() &&
+                "gzip".equalsIgnoreCase(pushReq.headers().get("Content-Encoding"))) {
+              buffer = Okio.buffer(new GzipSource(push.getSource()));
+            } else {
+              buffer = Okio.buffer(push.getSource());
+            }
+            return pushObserver.onPush(pushReq, buffer);
+          } catch (IOException ignored) {
+            return true;
+          }
+        }
+      };
+    }
   }
 
   @Override public void writeRequestBody(RetryableSink requestBody) throws IOException {
@@ -207,6 +240,46 @@ public final class SpdyTransport implements Transport {
   @Override public ResponseBody openResponseBody(Response response) throws IOException {
     return new RealResponseBody(response.headers(), Okio.buffer(stream.getSource()));
   }
+
+  /** Returns headers for a name value block containing a SPDY response. */
+  public static Request.Builder readPushNameValueBlock(List<Header> headerBlock,
+      Protocol protocol) throws IOException {
+    String path = null;
+    String host = null;
+
+    Headers.Builder headersBuilder = new Headers.Builder();
+    headersBuilder.set(OkHeaders.SELECTED_PROTOCOL, protocol.toString());
+    for (int i = 0; i < headerBlock.size(); i++) {
+      ByteString name = headerBlock.get(i).name;
+      String values = headerBlock.get(i).value.utf8();
+      for (int start = 0; start < values.length(); ) {
+        int end = values.indexOf('\0', start);
+        if (end == -1) {
+          end = values.length();
+        }
+        String value = values.substring(start, end);
+        if (name.equals(TARGET_PATH)) {
+          path = value;
+          // Add :path header to enable transparent decompression
+          headersBuilder.add(name.utf8(), value);
+        } else if (name.equals(TARGET_HOST)) {
+          host = value;
+        } else if (!isProhibitedHeader(protocol, name)) { // Don't write forbidden headers!
+          headersBuilder.add(name.utf8(), value);
+        }
+        start = end + 1;
+      }
+    }
+    if (path == null || host == null) {
+      throw new ProtocolException("Expected ':path',':host' headers are not present");
+    }
+
+    // XXX Any way to get real scheme?
+    return new Request.Builder()
+        .url("https://" + host + path)
+        .headers(headersBuilder.build());
+  }
+
 
   @Override public void releaseConnectionOnIdle() {
   }
