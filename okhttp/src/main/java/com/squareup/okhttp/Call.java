@@ -331,4 +331,11 @@ public class Call {
   public Headers getResponseHeaders() throws IOException {
     return engine.getResponseHeaders();
   }
+
+  /**
+   * Attach some request trailers
+   */
+  public void setRequestTrailers(Headers trailers) throws IOException {
+    engine.setRequestTrailers(trailers);
+  }
 }

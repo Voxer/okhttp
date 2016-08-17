@@ -37,7 +37,6 @@ import com.squareup.okhttp.internal.Version;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.net.CookieHandler;
-import java.net.InetAddress;
 import java.net.ProtocolException;
 import java.net.Proxy;
 import java.net.URL;
@@ -764,6 +763,8 @@ public final class HttpEngine {
 
     if (forWebSocket) {
       transport.writeRequestHeaders(networkRequest);
+      transport.writeRequestTrailers(userRequest);
+
       networkResponse = readNetworkResponse();
 
     } else if (!callerWritesRequestBody) {
@@ -799,6 +800,8 @@ public final class HttpEngine {
           transport.writeRequestBody((RetryableSink) requestBodyOut);
         }
       }
+
+      transport.writeRequestTrailers(userRequest);
 
       networkResponse = readNetworkResponse();
     }
@@ -909,6 +912,8 @@ public final class HttpEngine {
         bufferedRequestBody.close();
       }
 
+      transport.writeRequestTrailers(userRequest);
+
       Response response = readNetworkResponse();
 
       int code = response.code();
@@ -1010,6 +1015,14 @@ public final class HttpEngine {
   public Headers getResponseHeaders() throws IOException {
     Response.Builder builder = transport.readResponseHeaders().request(networkRequest);
     return builder.build().headers();
+  }
+
+  /**
+   * Similarly, this is used to write a trailer to the end of a given request
+   */
+  public void setRequestTrailers(Headers trailers) {
+    // Set request trailers on userRequest, to avoid loosing them when networkRequest is modified by interceptors.
+    userRequest.setTrailers(trailers);
   }
 
   /**

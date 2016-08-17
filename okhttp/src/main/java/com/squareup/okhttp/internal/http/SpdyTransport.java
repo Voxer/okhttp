@@ -141,6 +141,29 @@ public final class SpdyTransport implements Transport {
     requestBody.writeToSocket(stream.getSink());
   }
 
+  @Override public void writeRequestTrailers(Request request) throws IOException {
+    // Convert to writeNameValueBlock
+    Headers trailers = request.trailers();
+    if (trailers == null) {
+      return;
+    }
+
+    List<Header> result = new ArrayList<>(trailers.size() + 10);
+    for (int i = 0; i < trailers.size(); i++) {
+      String headerName = trailers.name(i);
+      if (headerName == null) {
+        continue;
+      }
+
+      // header names must be lowercase.
+      ByteString name = ByteString.encodeUtf8(headerName.toLowerCase(Locale.US));
+      String value = trailers.value(i);
+      result.add(new Header(name, value));
+    }
+    // Use connection to write directly with stream ID.
+    spdyConnection.writeHeaders(stream.getId(), result);
+  }
+
   @Override public void finishRequest() throws IOException {
     stream.getSink().close();
   }
