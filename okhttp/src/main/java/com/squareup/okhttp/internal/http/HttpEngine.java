@@ -788,6 +788,8 @@ public final class HttpEngine {
         transport.writeRequestHeaders(networkRequest);
       }
 
+      transport.writeRequestTrailers(userRequest);
+
       // Write the request body to the socket.
       if (requestBodyOut != null) {
         if (bufferedRequestBody != null) {
@@ -800,8 +802,6 @@ public final class HttpEngine {
           transport.writeRequestBody((RetryableSink) requestBodyOut);
         }
       }
-
-      transport.writeRequestTrailers(userRequest);
 
       networkResponse = readNetworkResponse();
     }
@@ -909,10 +909,9 @@ public final class HttpEngine {
         Sink requestBodyOut = transport.createRequestBody(request, request.body().contentLength());
         BufferedSink bufferedRequestBody = Okio.buffer(requestBodyOut);
         request.body().writeTo(bufferedRequestBody);
+        transport.writeRequestTrailers(userRequest);
         bufferedRequestBody.close();
       }
-
-      transport.writeRequestTrailers(userRequest);
 
       Response response = readNetworkResponse();
 
