@@ -232,11 +232,13 @@ public final class SpdyStream {
       return; // Already closed.
     }
     // Close down dependant pushed streams
+
     for(SpdyStream pushed : pushedStreams) {
-      int pushedId = pushed.getId();
       pushed.getSource().close();
-      pushedStreams.remove(pushedId);
     }
+
+    pushedStreams.clear();
+
     connection.writeSynReset(id, rstStatusCode);
   }
 
