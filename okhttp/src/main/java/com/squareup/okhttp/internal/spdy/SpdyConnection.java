@@ -18,14 +18,14 @@ package com.squareup.okhttp.internal.spdy;
 import com.squareup.okhttp.Protocol;
 import com.squareup.okhttp.internal.NamedRunnable;
 import com.squareup.okhttp.internal.Util;
+import com.squareup.okhttp.internal.UtilsTrace;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -34,12 +34,13 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import okio.Buffer;
 import okio.BufferedSource;
 import okio.ByteString;
 import okio.Okio;
 
-import static com.squareup.okhttp.internal.Internal.logger;
 import static com.squareup.okhttp.internal.spdy.Settings.DEFAULT_INITIAL_WINDOW_SIZE;
 
 /**
@@ -52,6 +53,8 @@ import static com.squareup.okhttp.internal.spdy.Settings.DEFAULT_INITIAL_WINDOW_
  * was triggered by a certain caller can be caught and handled by that caller.
  */
 public final class SpdyConnection implements Closeable {
+
+  static final Logger logger = Logger.getLogger("SpdyConnection");
 
   // Internal state of this connection is guarded by 'this'. No blocking
   // operations may be performed while holding this lock!
@@ -264,6 +267,8 @@ public final class SpdyConnection implements Closeable {
         streamId = nextStreamId;
         nextStreamId += 2;
         stream = new SpdyStream(streamId, this, outFinished, inFinished, requestHeaders);
+        logger.info("newStream: " + streamId + ", headers: " + requestHeaders + ", isOpen: " + stream.isOpen());
+
         if (stream.isOpen()) {
           streams.put(streamId, stream);
           setIdle(false);
@@ -353,6 +358,8 @@ public final class SpdyConnection implements Closeable {
   }
 
   void writeSynResetLater(final int streamId, final ErrorCode errorCode) {
+    logger.info(">" + streamId + " later: " + Spdy3.FrameType.RST_STREAM + ", error: " + errorCode + ", stack: " + UtilsTrace.printStackTrace());
+
     executor.submit(new NamedRunnable("OkHttp %s stream %d", hostName, streamId) {
       @Override public void execute() {
         try {
@@ -582,6 +589,9 @@ public final class SpdyConnection implements Closeable {
     @Override protected void execute() {
       ErrorCode connectionErrorCode = ErrorCode.INTERNAL_ERROR;
       ErrorCode streamErrorCode = ErrorCode.INTERNAL_ERROR;
+
+      logger.info("start reading from: " + socket.getInetAddress() + ", connection: " + this);
+
       try {
         frameReader = variant.newReader(Okio.buffer(Okio.source(socket)), client);
         if (!client) {
@@ -589,12 +599,19 @@ public final class SpdyConnection implements Closeable {
         }
         while (frameReader.nextFrame(this)) {
         }
+
+        logger.info("done reading from: " + socket.getInetAddress() + ", connection: " + this);
+
         connectionErrorCode = ErrorCode.NO_ERROR;
         streamErrorCode = ErrorCode.CANCEL;
-      } catch (IOException e) {
+      } catch (Exception e) {
+        logger.info("error reading from: " + socket.getInetAddress() + ", connection: " + this + ", error: " + e);
+
         connectionErrorCode = ErrorCode.PROTOCOL_ERROR;
         streamErrorCode = ErrorCode.PROTOCOL_ERROR;
       } finally {
+        logger.info("finished reading from: " + socket.getInetAddress() + ", connection: " + this);
+
         try {
           close(connectionErrorCode, streamErrorCode);
         } catch (IOException ignored) {
@@ -608,9 +625,11 @@ public final class SpdyConnection implements Closeable {
       SpdyStream dataStream = getStream(streamId);
       if (dataStream == null) {
         writeSynResetLater(streamId, ErrorCode.INVALID_STREAM);
+
         source.skip(length);
         return;
       }
+
       dataStream.receiveData(source, length);
       if (inFinished) {
         dataStream.receiveFin();
@@ -659,6 +678,8 @@ public final class SpdyConnection implements Closeable {
           // Create a stream.
           final SpdyStream newStream = new SpdyStream(streamId, SpdyConnection.this, outFinished,
               inFinished, headerBlock);
+          logger.info("newStream: headers: " + streamId + ", headers: " + headerBlock + ", isOpen: " + newStream.isOpen());
+
           lastGoodStreamId = streamId;
           streams.put(streamId, newStream);
 

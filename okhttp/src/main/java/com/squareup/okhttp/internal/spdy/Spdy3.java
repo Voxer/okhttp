@@ -17,11 +17,16 @@ package com.squareup.okhttp.internal.spdy;
 
 import com.squareup.okhttp.Protocol;
 import com.squareup.okhttp.internal.Util;
+import com.squareup.okhttp.internal.UtilsTrace;
+
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.ProtocolException;
 import java.util.List;
+import java.util.logging.Logger;
 import java.util.zip.Deflater;
+
 import okio.Buffer;
 import okio.BufferedSink;
 import okio.BufferedSource;
@@ -34,6 +39,8 @@ import okio.Okio;
  * http://www.chromium.org/spdy/spdy-protocol/spdy-protocol-draft3-1
  */
 public final class Spdy3 implements Variant {
+
+  static final Logger logger = Logger.getLogger("Spdy3");
 
   @Override public Protocol getProtocol() {
     return Protocol.SPDY_3;
@@ -48,6 +55,35 @@ public final class Spdy3 implements Variant {
   static final int TYPE_GOAWAY = 0x7;
   static final int TYPE_HEADERS = 0x8;
   static final int TYPE_WINDOW_UPDATE = 0x9;
+
+  enum FrameType {
+    DATA(TYPE_DATA),
+    SYN_STREAM(TYPE_SYN_STREAM),
+    SYN_REPLY(TYPE_SYN_REPLY),
+    RST_STREAM(TYPE_RST_STREAM),
+    SETTINGS(TYPE_SETTINGS),
+    PING(TYPE_PING),
+    GOAWAY(TYPE_GOAWAY),
+    HEADERS(TYPE_HEADERS),
+    WINDOW_UPDATE(TYPE_WINDOW_UPDATE),
+    UNKNOWN(Integer.MAX_VALUE);
+
+    final int type;
+
+    FrameType(int type) {
+      this.type = type;
+    }
+
+    static FrameType fromType(int type) {
+      for (FrameType t : values()) {
+        if (type == t.type) {
+          return t;
+        }
+      }
+
+      return UNKNOWN;
+    }
+  }
 
   static final int FLAG_FIN = 0x1;
   static final int FLAG_UNIDIRECTIONAL = 0x2;
@@ -129,6 +165,8 @@ public final class Spdy3 implements Variant {
         w1 = source.readInt();
         w2 = source.readInt();
       } catch (IOException e) {
+        logger.warning("read failed from source: " + source + ", ex: " + UtilsTrace.printStackTrace(e));
+
         return false; // This might be a normal socket close.
       }
 
@@ -178,12 +216,17 @@ public final class Spdy3 implements Variant {
             return true;
 
           default:
+            logger.info("<" + FrameType.UNKNOWN + " length: " + length);
+
             source.skip(length);
             return true;
         }
       } else {
         int streamId = w1 & 0x7fffffff;
         boolean inFinished = (flags & FLAG_FIN) != 0;
+
+        logger.info("<" + streamId + " " + FrameType.DATA + " length: " + length + ", inFinished: " + inFinished);
+
         handler.data(inFinished, streamId, source, length);
         return true;
       }
@@ -199,6 +242,9 @@ public final class Spdy3 implements Variant {
 
       boolean inFinished = (flags & FLAG_FIN) != 0;
       boolean outFinished = (flags & FLAG_UNIDIRECTIONAL) != 0;
+
+      logger.info("<" + streamId + " " + FrameType.SYN_STREAM + " - inFinished: " + inFinished + ", outFinished: " + outFinished + ", headers: " + headerBlock);
+
       handler.headers(outFinished, inFinished, streamId, associatedStreamId, headerBlock,
           HeadersMode.SPDY_SYN_STREAM);
     }
@@ -208,6 +254,9 @@ public final class Spdy3 implements Variant {
       int streamId = w1 & 0x7fffffff;
       List<Header> headerBlock = headerBlockReader.readNameValueBlock(length - 4);
       boolean inFinished = (flags & FLAG_FIN) != 0;
+
+      logger.info("<" + streamId + " " + FrameType.SYN_REPLY + " - inFinished: " + inFinished + ", headers: " + headerBlock);
+
       handler.headers(false, inFinished, streamId, -1, headerBlock, HeadersMode.SPDY_REPLY);
     }
 
@@ -219,6 +268,9 @@ public final class Spdy3 implements Variant {
       if (errorCode == null) {
         throw ioException("TYPE_RST_STREAM unexpected error code: %d", errorCodeInt);
       }
+
+      logger.info("<" + streamId + " " + FrameType.RST_STREAM + " error: " + errorCode);
+
       handler.rstStream(streamId, errorCode);
     }
 
@@ -226,6 +278,9 @@ public final class Spdy3 implements Variant {
       int w1 = source.readInt();
       int streamId = w1 & 0x7fffffff;
       List<Header> headerBlock = headerBlockReader.readNameValueBlock(length - 4);
+
+      logger.info("<" + streamId + " " + FrameType.HEADERS + ", headers: " + headerBlock);
+
       handler.headers(false, false, streamId, -1, headerBlock, HeadersMode.SPDY_HEADERS);
     }
 
@@ -235,6 +290,9 @@ public final class Spdy3 implements Variant {
       int w2 = source.readInt();
       int streamId = w1 & 0x7fffffff;
       long increment = w2 & 0x7fffffff;
+
+      logger.info("<" + streamId + " " + FrameType.WINDOW_UPDATE + ", increment: " + increment);
+
       if (increment == 0) throw ioException("windowSizeIncrement was 0", increment);
       handler.windowUpdate(streamId, increment);
     }
@@ -243,6 +301,9 @@ public final class Spdy3 implements Variant {
       if (length != 4) throw ioException("TYPE_PING length: %d != 4", length);
       int id = source.readInt();
       boolean ack = client == ((id & 1) == 1);
+
+      logger.info("<" + id + " " + FrameType.PING + ", ack: " + ack);
+
       handler.ping(ack, id, 0);
     }
 
@@ -251,6 +312,9 @@ public final class Spdy3 implements Variant {
       int lastGoodStreamId = source.readInt() & 0x7fffffff;
       int errorCodeInt = source.readInt();
       ErrorCode errorCode = ErrorCode.fromSpdyGoAway(errorCodeInt);
+
+      logger.info("<" + lastGoodStreamId + " " + FrameType.GOAWAY + ", errorCode: " + errorCode);
+
       if (errorCode == null) {
         throw ioException("TYPE_GOAWAY unexpected error code: %d", errorCodeInt);
       }
@@ -271,6 +335,9 @@ public final class Spdy3 implements Variant {
         settings.set(id, idFlags, value);
       }
       boolean clearPrevious = (flags & Settings.FLAG_CLEAR_PREVIOUSLY_PERSISTED_SETTINGS) != 0;
+
+      logger.info("<" + FrameType.SETTINGS + ", entries: " + numberOfEntries + ", settings: " + settings);
+
       handler.settings(clearPrevious, settings);
     }
 
@@ -279,6 +346,8 @@ public final class Spdy3 implements Variant {
     }
 
     @Override public void close() throws IOException {
+      logger.fine("close");
+
       headerBlockReader.close();
     }
   }
@@ -329,6 +398,8 @@ public final class Spdy3 implements Variant {
       int type = TYPE_SYN_STREAM;
       int flags = (outFinished ? FLAG_FIN : 0) | (inFinished ? FLAG_UNIDIRECTIONAL : 0);
 
+      logger.info(">"+streamId + " " + FrameType.SYN_STREAM + ", headers: " + headerBlock);
+
       int unused = 0;
       sink.writeInt(0x80000000 | (VERSION & 0x7fff) << 16 | type & 0xffff);
       sink.writeInt((flags & 0xff) << 24 | length & 0xffffff);
@@ -347,6 +418,8 @@ public final class Spdy3 implements Variant {
       int flags = (outFinished ? FLAG_FIN : 0);
       int length = (int) (headerBlockBuffer.size() + 4);
 
+      logger.info(">"+streamId + " " + FrameType.SYN_REPLY + ", headers: " + headerBlock);
+
       sink.writeInt(0x80000000 | (VERSION & 0x7fff) << 16 | type & 0xffff);
       sink.writeInt((flags & 0xff) << 24 | length & 0xffffff);
       sink.writeInt(streamId & 0x7fffffff);
@@ -362,6 +435,8 @@ public final class Spdy3 implements Variant {
       int type = TYPE_HEADERS;
       int length = (int) (headerBlockBuffer.size() + 4);
 
+      logger.info(">"+streamId + " " + FrameType.HEADERS + ", headers: " + headerBlock);
+
       sink.writeInt(0x80000000 | (VERSION & 0x7fff) << 16 | type & 0xffff);
       sink.writeInt((flags & 0xff) << 24 | length & 0xffffff);
       sink.writeInt(streamId & 0x7fffffff);
@@ -375,6 +450,9 @@ public final class Spdy3 implements Variant {
       int flags = 0;
       int type = TYPE_RST_STREAM;
       int length = 8;
+
+      logger.info(">"+streamId + " " + FrameType.RST_STREAM + ", error: " + errorCode);
+
       sink.writeInt(0x80000000 | (VERSION & 0x7fff) << 16 | type & 0xffff);
       sink.writeInt((flags & 0xff) << 24 | length & 0xffffff);
       sink.writeInt(streamId & 0x7fffffff);
@@ -389,6 +467,15 @@ public final class Spdy3 implements Variant {
     @Override public synchronized void data(boolean outFinished, int streamId, Buffer source,
         int byteCount) throws IOException {
       int flags = (outFinished ? FLAG_FIN : 0);
+
+      ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+      if (source != null) {
+        source.copyTo(out);
+      }
+
+      logger.info(">" + streamId + " " + FrameType.DATA + ", outFinished: " + outFinished + ", byteCount: " + byteCount + ", data: " + (out.size() < 2500 ? out.toString("UTF-8") : "<trimmed>"));
+
       sendDataFrame(streamId, flags, source, byteCount);
     }
 
@@ -398,6 +485,7 @@ public final class Spdy3 implements Variant {
       if (byteCount > 0xffffffL) {
         throw new IllegalArgumentException("FRAME_TOO_LARGE max size is 16Mib: " + byteCount);
       }
+
       sink.writeInt(streamId & 0x7fffffff);
       sink.writeInt((flags & 0xff) << 24 | byteCount & 0xffffff);
       if (byteCount > 0) {
@@ -425,6 +513,9 @@ public final class Spdy3 implements Variant {
       int flags = 0;
       int size = settings.size();
       int length = 4 + size * 8;
+
+      logger.info("> " + FrameType.SETTINGS + ", settings: " + settings);
+
       sink.writeInt(0x80000000 | (VERSION & 0x7fff) << 16 | type & 0xffff);
       sink.writeInt((flags & 0xff) << 24 | length & 0xffffff);
       sink.writeInt(size);
@@ -445,6 +536,9 @@ public final class Spdy3 implements Variant {
       int type = TYPE_PING;
       int flags = 0;
       int length = 4;
+
+      logger.info("> " + FrameType.PING + ", payload1: " + payload1 + ", payload2: " + payload2 + ", isReply: " + payloadIsReply);
+
       sink.writeInt(0x80000000 | (VERSION & 0x7fff) << 16 | type & 0xffff);
       sink.writeInt((flags & 0xff) << 24 | length & 0xffffff);
       sink.writeInt(payload1);
@@ -460,6 +554,9 @@ public final class Spdy3 implements Variant {
       int type = TYPE_GOAWAY;
       int flags = 0;
       int length = 8;
+
+      logger.info("> " + FrameType.GOAWAY + ", lastGoodStreamId: " + lastGoodStreamId + ", errorCode: " + errorCode);
+
       sink.writeInt(0x80000000 | (VERSION & 0x7fff) << 16 | type & 0xffff);
       sink.writeInt((flags & 0xff) << 24 | length & 0xffffff);
       sink.writeInt(lastGoodStreamId);
@@ -477,6 +574,9 @@ public final class Spdy3 implements Variant {
       int type = TYPE_WINDOW_UPDATE;
       int flags = 0;
       int length = 8;
+
+      logger.info(">" + streamId + " " + FrameType.WINDOW_UPDATE + ", increment: " + increment);
+
       sink.writeInt(0x80000000 | (VERSION & 0x7fff) << 16 | type & 0xffff);
       sink.writeInt((flags & 0xff) << 24 | length & 0xffffff);
       sink.writeInt(streamId);
@@ -485,6 +585,8 @@ public final class Spdy3 implements Variant {
     }
 
     @Override public synchronized void close() throws IOException {
+      logger.info("close frameWriter");
+
       closed = true;
       Util.closeAll(sink, headerBlockOut);
     }

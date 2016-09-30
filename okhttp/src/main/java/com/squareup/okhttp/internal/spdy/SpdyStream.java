@@ -20,9 +20,11 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.LinkedHashSet;
+import java.util.logging.Logger;
+
 import okio.AsyncTimeout;
 import okio.Buffer;
 import okio.BufferedSource;
@@ -34,6 +36,8 @@ import static com.squareup.okhttp.internal.spdy.Settings.DEFAULT_INITIAL_WINDOW_
 
 /** A logical bidirectional stream. */
 public final class SpdyStream {
+  static final Logger logger = Logger.getLogger("SpdyStream");
+
   // Internal state is guarded by this. No long-running or potentially
   // blocking operations are performed while the lock is held.
 
@@ -618,11 +622,14 @@ public final class SpdyStream {
    */
   class SpdyTimeout extends AsyncTimeout {
     @Override protected void timedOut() {
+      logger.info("timeout: " + id +
+              ", timeoutNanos: " + readTimeout().timeoutNanos() +
+              ", deadlineNanos: " + (readTimeout().hasDeadline() ? readTimeout().deadlineNanoTime() : "false"));
       closeLater(ErrorCode.CANCEL);
     }
 
     public void exitAndThrowIfTimedOut() throws InterruptedIOException {
-      if (exit()) throw new InterruptedIOException("timeout");
+      if (exit()) throw new InterruptedIOException("Spdy: timeout: stream: " + id + ", headers: " + requestHeaders);
     }
   }
 }
